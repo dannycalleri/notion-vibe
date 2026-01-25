@@ -5,10 +5,13 @@
   "license": "ISC",
   "author": "",
   "type": "module",
-  "main": "index.js",
+  "main": "src/cli.js",
+  "bin": {
+    "notion-vibe": "src/cli.js"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node src/main.js"
+    "start": "node src/cli.js"
   },
   "dependencies": {
     "dotenv": "^17.2.3"
