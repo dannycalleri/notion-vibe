@@ -157,12 +157,14 @@ async function createPrIfPossible({
   await pushBranch(worktreePath, branchName);
 
   const body = context ? `Context:\n\n${context}` : undefined;
+  const headRef = `${repo.owner}:${branchName}`;
+  log(`Creating PR on ${repo.owner}/${repo.repo} head=${headRef} base=${baseBranch}`);
   const pr = await createPullRequest({
     token: config.githubToken,
     owner: repo.owner,
     repo: repo.repo,
     title,
-    head: branchName,
+    head: headRef,
     base: baseBranch,
     body,
   });
