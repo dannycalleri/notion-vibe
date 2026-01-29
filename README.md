@@ -16,19 +16,20 @@ From this repository root:
 
 ```bash
 npm install
-node src/cli.js --project-dir /path/to/your/project
+npm start -- --project-dir /path/to/your/project
 ```
 
-Or run from the target project root (if you want `PROJECT_DIR` to default to `cwd`):
+Or build once and run from the target project root (if you want `PROJECT_DIR` to default to `cwd`):
 
 ```bash
-node /path/to/notion-vibe/src/cli.js
+npm --prefix /path/to/notion-vibe run build
+node /path/to/notion-vibe/dist/cli.js
 ```
 
 To run against a different project directory, use `--project-dir`:
 
 ```bash
-node /path/to/notion-vibe/src/cli.js --project-dir /path/to/your/project
+node /path/to/notion-vibe/dist/cli.js --project-dir /path/to/your/project
 ```
 
 ## Configuration
@@ -69,7 +70,7 @@ PROJECT_DIR="/path/to/your/project"
 You can also pass CLI flags, which override env vars:
 
 ```bash
-node src/cli.js --notion-db-id YOUR_DB_ID --github-token YOUR_GH_TOKEN --project-dir /path/to/your/project
+node dist/cli.js --notion-db-id YOUR_DB_ID --github-token YOUR_GH_TOKEN --project-dir /path/to/your/project
 ```
 
 ## Usage Flow

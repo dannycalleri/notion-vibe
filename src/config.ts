@@ -1,32 +1,66 @@
 const DEFAULT_NOTION_VERSION = '2025-09-03';
 
-function parseArgs(argv) {
-  const out = {};
+export type AppConfig = {
+  notionToken?: string;
+  notionDbId?: string;
+  notionDataSourceId?: string;
+  notionDataSourceName?: string;
+  notionVersion: string;
+  statusProperty: string;
+  statusTodo: string;
+  statusInProgress: string;
+  statusInReview: string;
+  statusDone: string;
+  prProperty: string;
+  pollIntervalMs: number;
+  worktreeRoot: string;
+  baseBranch?: string;
+  agentCommand?: string;
+  agentArgs?: string;
+  agentTrustLevel: string;
+  codexInstallCommand?: string;
+  githubToken?: string;
+  githubRepoUrl?: string;
+  dryRun: boolean;
+  maxConcurrent: number;
+  projectDir: string;
+};
+
+function parseArgs(argv: string[]) {
+  const out: Record<string, string> = {};
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
+    
+    // Ignore all arguments not starting with '--'
     if (!arg.startsWith('--')) continue;
     const [key, eqValue] = arg.slice(2).split('=');
     if (eqValue !== undefined) {
       out[key] = eqValue;
       continue;
     }
+    // Support both `--key value` and `--flag` forms. Example:
+    // argv = ["--project-dir", "/tmp/app", "--dry-run"] =>
+    // out["project-dir"] = "/tmp/app", out["dry-run"] = "true".
     const next = argv[i + 1];
+
+    // This case means that next argument is actually the value
     if (next && !next.startsWith('--')) {
       out[key] = next;
       i += 1;
     } else {
+      // This case means the argument is value less, like --dry-run
       out[key] = 'true';
     }
   }
   return out;
 }
 
-function toNumber(value, fallback) {
+function toNumber(value: unknown, fallback: number) {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 }
 
-function toBool(value, fallback = false) {
+function toBool(value: unknown, fallback = false) {
   if (value === undefined) return fallback;
   if (typeof value === 'boolean') return value;
   const normalized = String(value).toLowerCase().trim();
@@ -35,7 +69,7 @@ function toBool(value, fallback = false) {
   return fallback;
 }
 
-export function loadConfig(argv) {
+export function loadConfig(argv: string[]): AppConfig {
   const args = parseArgs(argv);
   return {
     notionToken: args['notion-token'] ?? process.env.NOTION_TOKEN,

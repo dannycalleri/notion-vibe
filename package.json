@@ -5,13 +5,15 @@
   "license": "ISC",
   "author": "",
   "type": "module",
-  "main": "src/cli.js",
+  "main": "dist/cli.js",
   "bin": {
-    "notion-vibe": "src/cli.js"
+    "notion-vibe": "dist/cli.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node src/cli.js",
+    "prestart": "npm run build --silent",
+    "start": "node dist/cli.js",
+    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
