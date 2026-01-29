@@ -26,7 +26,7 @@ export type AppConfig = {
   projectDir: string;
 };
 
-function parseArgs(argv: string[]) {
+export function parseArgs(argv: string[]) {
   const out: Record<string, string> = {};
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -55,12 +55,12 @@ function parseArgs(argv: string[]) {
   return out;
 }
 
-function toNumber(value: unknown, fallback: number) {
+export function toNumber(value: unknown, fallback: number) {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 }
 
-function toBool(value: unknown, fallback = false) {
+export function toBool(value: unknown, fallback = false) {
   if (value === undefined) return fallback;
   if (typeof value === 'boolean') return value;
   const normalized = String(value).toLowerCase().trim();
