@@ -1,5 +1,3 @@
-const DEFAULT_NOTION_VERSION = '2025-09-03';
-
 export type AppConfig = {
   notionToken?: string;
   notionDbId?: string;
@@ -25,6 +23,8 @@ export type AppConfig = {
   maxConcurrent: number;
   projectDir: string;
 };
+
+export const GITHUB_API = 'https://api.github.com';
 
 export function parseArgs(argv: string[]) {
   const out: Record<string, string> = {};
@@ -70,6 +70,7 @@ export function toBool(value: unknown, fallback = false) {
 }
 
 export function loadConfig(argv: string[]): AppConfig {
+  const DEFAULT_NOTION_VERSION = '2025-09-03';
   const args = parseArgs(argv);
   return {
     notionToken: args['notion-token'] ?? process.env.NOTION_TOKEN,
