@@ -3,7 +3,22 @@ import { access, readdir } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
 
-async function pathExists(filePath) {
+type RunAgentInput = {
+  command: string;
+  args: string[];
+  cwd: string;
+  env?: Record<string, string | undefined>;
+};
+
+type BuildAgentArgsInput = {
+  command: string;
+  trustLevel?: string;
+  title: string;
+  context?: string;
+  argsTemplate?: string;
+};
+
+async function pathExists(filePath: string) {
   try {
     await access(filePath, constants.X_OK);
     return true;
@@ -12,13 +27,13 @@ async function pathExists(filePath) {
   }
 }
 
-async function findInDir(dir, name) {
+async function findInDir(dir: string, name: string) {
   const fullPath = path.join(dir, name);
   if (await pathExists(fullPath)) return fullPath;
   return null;
 }
 
-async function findInPath(name) {
+async function findInPath(name: string) {
   const paths = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
   for (const dir of paths) {
     const found = await findInDir(dir, name);
@@ -58,8 +73,9 @@ async function findCodexInHome() {
   return null;
 }
 
-async function findCodexInProject(projectDir) {
+async function findCodexInProject(projectDir: string) {
   let current = projectDir;
+  // Walk up a few directory levels to find a parent node_modules/.bin/codex (e.g.: monorepo).
   for (let i = 0; i < 4; i += 1) {
     const candidate = path.join(current, 'node_modules', '.bin', 'codex');
     if (await pathExists(candidate)) return candidate;
@@ -70,14 +86,14 @@ async function findCodexInProject(projectDir) {
   return null;
 }
 
-export async function locateCodexBinary(projectDir) {
+export async function locateCodexBinary(projectDir: string) {
   return (await findInPath('codex'))
     || (await findCodexInProject(projectDir))
     || (await findCodexInHome());
 }
 
-export async function runAgent({ command, args, cwd, env }) {
-  return new Promise((resolve, reject) => {
+export async function runAgent({ command, args, cwd, env }: RunAgentInput) {
+  return new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
       env: { ...process.env, ...env },
@@ -91,19 +107,20 @@ export async function runAgent({ command, args, cwd, env }) {
   });
 }
 
-function buildPrompt(title, context) {
+function buildPrompt(title: string, context?: string) {
   if (context) return `${title}\n\nContext:\n${context}`;
   return title;
 }
 
-export function buildAgentArgs({ command, trustLevel, title, context, argsTemplate }) {
+export function buildAgentArgs({ command, trustLevel, title, context, argsTemplate }: BuildAgentArgsInput) {
   const prompt = buildPrompt(title, context);
   if (argsTemplate) {
     let tokens = [];
     const trimmed = argsTemplate.trim();
+    
     if (trimmed.startsWith('[')) {
       try {
-        tokens = JSON.parse(trimmed);
+        tokens = JSON.parse(trimmed) as unknown[];
       } catch {
         tokens = trimmed.split(' ').filter(Boolean);
       }
@@ -112,7 +129,7 @@ export function buildAgentArgs({ command, trustLevel, title, context, argsTempla
     }
     return tokens.map((token) => String(token)
       .replaceAll('{title}', title)
-      .replaceAll('{context}', context)
+      .replaceAll('{context}', context ?? '')
       .replaceAll('{prompt}', prompt));
   }
 
