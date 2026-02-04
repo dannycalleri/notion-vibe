@@ -26,16 +26,69 @@ import {
 } from './notion.js';
 import { parseGithubRepo, createPullRequest } from './github.js';
 import { locateCodexBinary, runAgent, buildAgentArgs } from './agent.js';
+import type { AppConfig } from './config.js';
 
-function log(message, ...args) {
+type NotionPage = {
+  id: string;
+  [key: string]: any;
+};
+
+type EnsureWorktreeInput = {
+  repoRoot: string;
+  worktreeRoot: string;
+  branchName: string;
+  baseRef: string;
+};
+
+type CreatePrInput = {
+  config: AppConfig;
+  repoRoot: string;
+  worktreePath: string;
+  branchName: string;
+  baseBranch: string;
+  title: string;
+  context?: string;
+};
+
+type UpdateStatusInput = {
+  config: AppConfig;
+  pageId: string;
+  statusName: string;
+  prUrl?: string | null;
+};
+
+type HandlePageInput = {
+  page: NotionPage;
+  config: AppConfig;
+  repoRoot: string;
+  baseBranch: string;
+  agentCommand: string;
+};
+
+type PollDatabaseInput = {
+  config: AppConfig;
+  dataSourceId: string;
+  inFlight: Set<string>;
+  queue: NotionPage[];
+};
+
+type StartQueueInput = {
+  config: AppConfig;
+  repoRoot: string;
+  baseBranch: string;
+  agentCommand: string;
+  dataSourceId: string;
+};
+
+function log(message: string, ...args: unknown[]) {
   console.log(`[notion-vibe] ${message}`, ...args);
 }
 
-function warn(message, ...args) {
+function warn(message: string, ...args: unknown[]) {
   console.warn(`[notion-vibe] ${message}`, ...args);
 }
 
-function formatCommand(command, args) {
+function formatCommand(command: string, args: string[]) {
   const escape = (value) => {
     const str = String(value);
     if (/^[a-zA-Z0-9._/:-]+$/.test(str)) return str;
@@ -44,7 +97,7 @@ function formatCommand(command, args) {
   return [command, ...(args || [])].map(escape).join(' ');
 }
 
-function slugify(value) {
+function slugify(value: string) {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -52,25 +105,25 @@ function slugify(value) {
     .slice(0, 40) || 'task';
 }
 
-function buildBranchName(title, pageId) {
+function buildBranchName(title: string, pageId: string) {
   const slug = slugify(title);
   const shortId = pageId.replace(/-/g, '').slice(0, 8);
   return `notion/${slug}-${shortId}`;
 }
 
-function getWorktreePath(repoRoot, worktreeRoot, branchName) {
+function getWorktreePath(repoRoot: string, worktreeRoot: string, branchName: string) {
   return path.join(repoRoot, worktreeRoot, branchName);
 }
 
-async function promptYesNo(question) {
+async function promptYesNo(question: string) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const answer = await new Promise((resolve) => rl.question(question, resolve));
   rl.close();
   return ['y', 'yes'].includes(String(answer).trim().toLowerCase());
 }
 
-async function runShellCommand(command, cwd) {
-  return new Promise((resolve, reject) => {
+async function runShellCommand(command: string, cwd: string) {
+  return new Promise<void>((resolve, reject) => {
     const child = spawn(command, {
       cwd,
       stdio: 'inherit',
@@ -84,7 +137,7 @@ async function runShellCommand(command, cwd) {
   });
 }
 
-async function ensureAgentCommand(config, projectDir) {
+async function ensureAgentCommand(config: AppConfig, projectDir: string) {
   if (config.agentCommand) return config.agentCommand;
 
   const codexPath = await locateCodexBinary(projectDir);
@@ -103,7 +156,7 @@ async function ensureAgentCommand(config, projectDir) {
   return locateCodexBinary(projectDir);
 }
 
-async function ensureWorktree({ repoRoot, worktreeRoot, branchName, baseRef }) {
+async function ensureWorktree({ repoRoot, worktreeRoot, branchName, baseRef }: EnsureWorktreeInput) {
   const existing = await getWorktreeForBranch(repoRoot, branchName);
   if (existing?.path) {
     try {
@@ -141,7 +194,7 @@ async function createPrIfPossible({
   baseBranch,
   title,
   context,
-}) {
+}: CreatePrInput) {
   if (!config.githubToken) {
     warn('GITHUB_TOKEN missing; skipping PR creation.');
     return null;
@@ -173,8 +226,8 @@ async function createPrIfPossible({
   return pr.html_url;
 }
 
-async function updateNotionStatus({ config, pageId, statusName, prUrl }) {
-  const properties = {
+async function updateNotionStatus({ config, pageId, statusName, prUrl }: UpdateStatusInput) {
+  const properties: Record<string, unknown> = {
     [config.statusProperty]: { status: { name: statusName } },
   };
   if (prUrl) {
@@ -188,7 +241,7 @@ async function updateNotionStatus({ config, pageId, statusName, prUrl }) {
   });
 }
 
-async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }) {
+async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }: HandlePageInput) {
   const title = getTitleFromPage(page);
   const blocks = await getAllBlocks({
     token: config.notionToken,
@@ -269,7 +322,7 @@ async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }) 
   });
 }
 
-async function pollDatabase({ config, dataSourceId, inFlight, queue }) {
+async function pollDatabase({ config, dataSourceId, inFlight, queue }: PollDatabaseInput) {
   const res = await queryDataSource({
     token: config.notionToken,
     version: config.notionVersion,
@@ -288,9 +341,9 @@ async function pollDatabase({ config, dataSourceId, inFlight, queue }) {
   }
 }
 
-async function startQueue({ config, repoRoot, baseBranch, agentCommand, dataSourceId }) {
-  const inFlight = new Set();
-  const queue = [];
+async function startQueue({ config, repoRoot, baseBranch, agentCommand, dataSourceId }: StartQueueInput) {
+  const inFlight = new Set<string>();
+  const queue: NotionPage[] = [];
   let running = 0;
 
   const drain = async () => {
@@ -327,7 +380,7 @@ async function startQueue({ config, repoRoot, baseBranch, agentCommand, dataSour
   setInterval(tick, config.pollIntervalMs);
 }
 
-export async function startServer(config) {
+export async function startServer(config: AppConfig) {
   if (!config.notionToken) {
     throw new Error('NOTION_TOKEN is required.');
   }
