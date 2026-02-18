@@ -1,7 +1,6 @@
 import { access, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import readline from 'node:readline';
-import { spawn } from 'node:child_process';
 import {
   getRepoRoot,
   getCurrentBranch,
@@ -25,6 +24,7 @@ import {
 } from './notion.js';
 import { parseGithubRepo, createPullRequest } from './github.js';
 import { locateCodexBinary, runAgent, buildAgentArgs } from './agent.js';
+import { runShellCommand } from './shell.js';
 import type { AppConfig } from './config.js';
 
 type NotionPage = {
@@ -120,21 +120,6 @@ async function promptYesNo(question: string) {
   return ['y', 'yes'].includes(String(answer).trim().toLowerCase());
 }
 
-async function runShellCommand(command: string, cwd: string) {
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn(command, {
-      cwd,
-      stdio: 'inherit',
-      shell: true,
-    });
-    child.on('error', reject);
-    child.on('exit', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Command failed with code ${code}`));
-    });
-  });
-}
-
 async function ensureAgentCommand(config: AppConfig, projectDir: string) {
   if (config.agentCommand) return config.agentCommand;
 
@@ -150,7 +135,7 @@ async function ensureAgentCommand(config: AppConfig, projectDir: string) {
     return null;
   }
 
-  await runShellCommand(config.codexInstallCommand, projectDir);
+  await runShellCommand(config.codexInstallCommand, { cwd: projectDir, stdio: 'inherit' });
   return locateCodexBinary(projectDir);
 }
 

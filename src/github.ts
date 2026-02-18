@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { runCommand, runShellCommand, isMissingCommandError } from './shell.js';
 
 type GithubRepo = {
   owner: string;
@@ -41,39 +41,13 @@ export function parseGithubRepo(remoteUrl: string | null | undefined): GithubRep
   }
 }
 
-async function runCommand(command: string, args: string[], cwd: string) {
-  return new Promise<string>((resolve, reject) => {
-    execFile(command, args, { cwd }, (error, stdout, stderr) => {
-      if (error) {
-        const err = error as ExecError;
-        err.stdout = stdout;
-        err.stderr = stderr;
-        reject(err);
-        return;
-      }
-      resolve(stdout.trim());
-    });
-  });
-}
-
-async function runShellCommand(command: string, cwd: string) {
-  if (process.platform === 'win32') {
-    return runCommand('cmd.exe', ['/d', '/s', '/c', command], cwd);
-  }
-  return runCommand('sh', ['-lc', command], cwd);
-}
-
-function isMissingCommandError(error: unknown) {
-  return typeof error === 'object' && error !== null && (error as ExecError).code === 'ENOENT';
-}
-
 async function commandExists(command: string, cwd: string) {
   try {
     if (process.platform === 'win32') {
-      await runCommand('where', [command], cwd);
+      await runCommand('where', [command], { cwd });
       return true;
     }
-    await runShellCommand(`command -v ${command}`, cwd);
+    await runShellCommand(`command -v ${command}`, { cwd });
     return true;
   } catch {
     return false;
@@ -82,12 +56,12 @@ async function commandExists(command: string, cwd: string) {
 
 async function installGh(cwd: string, installCommand?: string) {
   if (installCommand) {
-    await runShellCommand(installCommand, cwd);
+    await runShellCommand(installCommand, { cwd });
     return;
   }
 
   if (process.platform === 'darwin' && await commandExists('brew', cwd)) {
-    await runShellCommand('brew install gh', cwd);
+    await runShellCommand('brew install gh', { cwd });
     return;
   }
 
@@ -96,38 +70,38 @@ async function installGh(cwd: string, installCommand?: string) {
     const prefix = useSudo ? 'sudo ' : '';
 
     if (await commandExists('apt-get', cwd)) {
-      await runShellCommand(`${prefix}apt-get update && ${prefix}apt-get install -y gh`, cwd);
+      await runShellCommand(`${prefix}apt-get update && ${prefix}apt-get install -y gh`, { cwd });
       return;
     }
     if (await commandExists('dnf', cwd)) {
-      await runShellCommand(`${prefix}dnf install -y gh`, cwd);
+      await runShellCommand(`${prefix}dnf install -y gh`, { cwd });
       return;
     }
     if (await commandExists('yum', cwd)) {
-      await runShellCommand(`${prefix}yum install -y gh`, cwd);
+      await runShellCommand(`${prefix}yum install -y gh`, { cwd });
       return;
     }
     if (await commandExists('pacman', cwd)) {
-      await runShellCommand(`${prefix}pacman -Sy --noconfirm github-cli`, cwd);
+      await runShellCommand(`${prefix}pacman -Sy --noconfirm github-cli`, { cwd });
       return;
     }
     if (await commandExists('zypper', cwd)) {
-      await runShellCommand(`${prefix}zypper --non-interactive install gh`, cwd);
+      await runShellCommand(`${prefix}zypper --non-interactive install gh`, { cwd });
       return;
     }
   }
 
   if (process.platform === 'win32') {
     if (await commandExists('winget', cwd)) {
-      await runShellCommand('winget install --id GitHub.cli -e --source winget', cwd);
+      await runShellCommand('winget install --id GitHub.cli -e --source winget', { cwd });
       return;
     }
     if (await commandExists('choco', cwd)) {
-      await runShellCommand('choco install gh -y', cwd);
+      await runShellCommand('choco install gh -y', { cwd });
       return;
     }
     if (await commandExists('scoop', cwd)) {
-      await runShellCommand('scoop install gh', cwd);
+      await runShellCommand('scoop install gh', { cwd });
       return;
     }
   }
@@ -139,7 +113,7 @@ async function installGh(cwd: string, installCommand?: string) {
 
 async function ensureGhInstalled(cwd: string, installCommand?: string) {
   try {
-    await runCommand('gh', ['--version'], cwd);
+    await runCommand('gh', ['--version'], { cwd });
     return;
   } catch (error) {
     if (!isMissingCommandError(error)) throw error;
@@ -147,7 +121,7 @@ async function ensureGhInstalled(cwd: string, installCommand?: string) {
 
   await installGh(cwd, installCommand);
   try {
-    await runCommand('gh', ['--version'], cwd);
+    await runCommand('gh', ['--version'], { cwd });
   } catch (error) {
     throw new Error(
       `GitHub CLI installation did not produce a working "gh" binary: ${String((error as ExecError)?.message || error)}`
@@ -157,7 +131,7 @@ async function ensureGhInstalled(cwd: string, installCommand?: string) {
 
 async function ensureGhAuthenticated(cwd: string) {
   try {
-    await runCommand('gh', ['auth', 'status', '--hostname', 'github.com'], cwd);
+    await runCommand('gh', ['auth', 'status', '--hostname', 'github.com'], { cwd });
   } catch (error) {
     const stderr = (error as ExecError)?.stderr?.trim();
     const details = stderr ? ` ${stderr}` : '';
@@ -197,7 +171,7 @@ export async function createPullRequest({
     args.push('--repo', repo);
   }
 
-  const output = await runCommand('gh', args, cwd);
+  const output = await runCommand('gh', args, { cwd });
   const htmlUrl = extractPullRequestUrl(output);
   if (!htmlUrl) {
     throw new Error(`Unable to parse pull request URL from gh output: ${output}`);
