@@ -19,6 +19,8 @@ npm install
 npm start -- --project-dir /path/to/your/project
 ```
 
+`npm start` runs `prestart` first, which builds TypeScript into `dist/`.
+
 Or build once and run from the target project root (if you want `PROJECT_DIR` to default to `cwd`):
 
 ```bash
@@ -75,7 +77,7 @@ node dist/cli.js --notion-db-id YOUR_DB_ID --github-token YOUR_GH_TOKEN --projec
 
 ## Usage Flow
 
-1. Start the server: `npm start` or `node src/cli.js`.
+1. Start the server: `npm start`
 2. Create a task in your Notion database and set Status to `In progress`.
 3. The server:
    - Creates a worktree on a new branch
@@ -89,7 +91,14 @@ node dist/cli.js --notion-db-id YOUR_DB_ID --github-token YOUR_GH_TOKEN --projec
 Use dry-run mode to skip agent execution and git/PR actions:
 
 ```bash
-node src/cli.js --dry-run true
+npm start -- --dry-run true
+```
+
+Run automated checks:
+
+```bash
+npm test
+npm run typecheck
 ```
 
 ## Notes

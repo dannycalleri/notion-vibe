@@ -2,29 +2,35 @@
 
 ## Project Structure & Module Organization
 
-- `src/` holds the runtime code for the CLI and server. Key modules include `src/cli.js` (entrypoint), `src/server.js` (polling/automation loop), and service clients like `src/notion.js` and `src/github.js`.
-- There is no dedicated `tests/` or `assets/` directory in this repo today.
-- Configuration is loaded from environment variables via `dotenv` (see `.env` usage below).
+- `src/` holds the TypeScript runtime code. Key modules include `src/cli.ts` (entrypoint), `src/server.ts` (polling/automation loop), `src/config.ts` (env/CLI config), and service clients like `src/notion.ts`, `src/github.ts`, and `src/git.ts`.
+- `tests/` contains Vitest test files (for example `tests/server.test.ts`, `tests/config.test.ts`).
+- `dist/` contains compiled JavaScript output from `tsc` and is the executable target for the CLI.
+- Configuration is loaded from environment variables via `dotenv/config`, with CLI flags overriding env values.
 
 ## Build, Test, and Development Commands
 
 - `npm install`: install runtime dependencies.
-- `npm start`: run the CLI (`node src/cli.js`).
-- `node src/cli.js --project-dir /path/to/project`: run against a specific project; defaults to `cwd` when `PROJECT_DIR` is not set.
-- `npm test`: currently exits with “no test specified”; add a test runner before relying on it.
-- `node src/cli.js --dry-run true`: safe mode that skips agent execution and git/PR side effects.
+- `npm run build`: compile TypeScript from `src/` to `dist/`.
+- `npm start -- --project-dir /path/to/project`: run the compiled CLI (`node dist/cli.js -- ...`). `prestart` runs a build first.
+- `node dist/cli.js --project-dir /path/to/project`: run directly against a specific project; defaults to `cwd` when `PROJECT_DIR` is not set.
+- `npm test`: run the test suite once via Vitest (`vitest run`).
+- `npm run test:watch`: run tests in watch mode.
+- `npm run typecheck`: run TypeScript type-checking without emitting build artifacts.
+- `npm start -- --dry-run true` (or `node dist/cli.js --dry-run true`): safe mode that skips agent execution and git/PR side effects.
 
 ## Coding Style & Naming Conventions
 
-- JavaScript uses ES modules (`"type": "module"` in `package.json`), Node.js 18+.
-- Indentation is 2 spaces; use semicolons and single quotes as shown in `src/*.js`.
-- File names are lower-case with hyphens or plain words (e.g., `server.js`, `git.js`).
+- TypeScript with NodeNext modules (`"type": "module"` in `package.json`), Node.js 18+.
+- Indentation is 2 spaces; use semicolons and single quotes as shown in `src/*.ts` and `tests/*.ts`.
+- File names are lower-case with hyphens or plain words (e.g., `server.ts`, `git.ts`).
+- Keep ESM import paths consistent with the codebase convention (using `.js` extensions in source imports for NodeNext compatibility).
 - Environment variables are upper snake case (e.g., `NOTION_TOKEN`, `GITHUB_TOKEN`).
 
 ## Testing Guidelines
 
-- No testing framework is configured yet; add one if you introduce non-trivial logic.
-- If you add tests, place them in a new `tests/` directory and name files with `.test.js`.
+- Vitest is configured (`vitest.config.ts`); keep tests in `tests/` and name files `*.test.ts`.
+- Prioritize unit tests for `src/config.ts`, API clients, and server orchestration paths when behavior changes.
+- Run `npm test` before finalizing changes; use `npm run test:watch` during development.
 - Use `--dry-run true` for manual verification of control flow without external side effects.
 
 ## Commit & Pull Request Guidelines
@@ -37,4 +43,4 @@
 ## Security & Configuration Tips
 
 - Store tokens in `.env` and never commit secrets.
-- Review `NOTION_*` and `GITHUB_*` variables in `README.md` when debugging config issues.
+- Review `NOTION_*`, `GITHUB_*`, and agent-related variables (`AGENT_*`, `CODEX_*`) in `README.md` when debugging config issues.
