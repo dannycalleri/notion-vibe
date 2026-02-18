@@ -31,11 +31,13 @@ describe('config helpers', () => {
   it('loadConfig composes defaults, env, and args', () => {
     vi.stubEnv('NOTION_TOKEN', 'env-token');
     vi.stubEnv('POLL_INTERVAL_MS', '15000');
+    vi.stubEnv('GH_INSTALL_COMMAND', 'brew install gh');
 
     const config = loadConfig(['--notion-token', 'arg-token', '--dry-run']);
 
     expect(config.notionToken).toBe('arg-token');
     expect(config.pollIntervalMs).toBe(15000);
+    expect(config.ghInstallCommand).toBe('brew install gh');
     expect(config.dryRun).toBe(true);
     expect(config.statusProperty).toBe('Status');
   });

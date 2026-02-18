@@ -17,14 +17,12 @@ export type AppConfig = {
   agentArgs?: string;
   agentTrustLevel: string;
   codexInstallCommand?: string;
-  githubToken?: string;
+  ghInstallCommand?: string;
   githubRepoUrl?: string;
   dryRun: boolean;
   maxConcurrent: number;
   projectDir: string;
 };
-
-export const GITHUB_API = 'https://api.github.com';
 
 export function parseArgs(argv: string[]) {
   const out: Record<string, string> = {};
@@ -91,7 +89,7 @@ export function loadConfig(argv: string[]): AppConfig {
     agentArgs: args['agent-args'] ?? process.env.AGENT_ARGS,
     agentTrustLevel: args['agent-trust-level'] ?? process.env.CODEX_TRUST_LEVEL ?? 'trusted',
     codexInstallCommand: args['codex-install-command'] ?? process.env.CODEX_INSTALL_COMMAND,
-    githubToken: args['github-token'] ?? process.env.GITHUB_TOKEN,
+    ghInstallCommand: args['gh-install-command'] ?? process.env.GH_INSTALL_COMMAND,
     githubRepoUrl: args['github-repo-url'] ?? process.env.GITHUB_REPO_URL,
     dryRun: toBool(args['dry-run'] ?? process.env.DRY_RUN, false),
     maxConcurrent: toNumber(args['max-concurrent'] ?? process.env.MAX_CONCURRENT, 1),

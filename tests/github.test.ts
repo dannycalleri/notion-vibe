@@ -1,10 +1,21 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createPullRequest, parseGithubRepo } from '../src/github.ts';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+
+const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn() }));
+
+vi.mock('node:child_process', () => ({
+  execFile: execFileMock,
+}));
+
+let createPullRequest: typeof import('../src/github.ts').createPullRequest;
+let parseGithubRepo: typeof import('../src/github.ts').parseGithubRepo;
 
 describe('github helpers', () => {
+  beforeAll(async () => {
+    ({ createPullRequest, parseGithubRepo } = await import('../src/github.ts'));
+  });
+
   afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
+    execFileMock.mockReset();
   });
 
   it('parseGithubRepo handles SSH URLs', () => {
@@ -27,45 +38,93 @@ describe('github helpers', () => {
     expect(parseGithubRepo('not-a-url')).toBeNull();
   });
 
-  it('createPullRequest posts to GitHub and returns JSON', async () => {
-    const json = vi.fn().mockResolvedValue({ html_url: 'https://github.com/octo-org/hello-world/pull/1' });
-    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, status: 201, json });
-
-    vi.stubGlobal('fetch', fetchSpy);
+  it('createPullRequest calls gh and returns PR URL', async () => {
+    execFileMock.mockImplementation((command, args, _options, callback) => {
+      const key = `${command} ${(args || []).join(' ')}`;
+      if (key === 'gh --version') return callback(null, 'gh version 2.0.0', '');
+      if (key === 'gh auth status --hostname github.com') return callback(null, 'ok', '');
+      if (key.includes('gh pr create')) {
+        return callback(null, 'https://github.com/octo-org/hello-world/pull/1\n', '');
+      }
+      return callback(new Error(`Unexpected command: ${key}`), '', '');
+    });
 
     const pr = await createPullRequest({
-      token: 'token',
-      owner: 'octo-org',
-      repo: 'hello-world',
+      cwd: '/repo',
+      repo: 'octo-org/hello-world',
       title: 'Add feature',
-      head: 'octo-org:feature',
+      head: 'feature',
       base: 'main',
       body: 'Context',
     });
 
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const [url, options] = fetchSpy.mock.calls[0];
-    expect(url).toBe('https://api.github.com/repos/octo-org/hello-world/pulls');
-    expect(options.method).toBe('POST');
-    expect(options.headers.Authorization).toBe('Bearer token');
     expect(pr).toEqual({ html_url: 'https://github.com/octo-org/hello-world/pull/1' });
+    expect(execFileMock).toHaveBeenCalledWith(
+      'gh',
+      expect.arrayContaining([
+        'pr',
+        'create',
+        '--repo',
+        'octo-org/hello-world',
+      ]),
+      { cwd: '/repo' },
+      expect.any(Function)
+    );
   });
 
-  it('createPullRequest throws with status on error', async () => {
-    const text = vi.fn().mockResolvedValue('Bad Request');
-    const fetchSpy = vi.fn().mockResolvedValue({ ok: false, status: 400, text });
+  it('createPullRequest installs gh with GH_INSTALL_COMMAND when missing', async () => {
+    let ghVersionChecks = 0;
+    execFileMock.mockImplementation((command, args, _options, callback) => {
+      const key = `${command} ${(args || []).join(' ')}`;
+      if (key === 'gh --version') {
+        ghVersionChecks += 1;
+        if (ghVersionChecks === 1) {
+          const error = Object.assign(new Error('not found'), { code: 'ENOENT' });
+          return callback(error, '', '');
+        }
+        return callback(null, 'gh version 2.0.0', '');
+      }
+      if (key === 'sh -lc npm i -g gh') return callback(null, '', '');
+      if (key === 'gh auth status --hostname github.com') return callback(null, 'ok', '');
+      if (key.includes('gh pr create')) return callback(null, 'https://github.com/octo-org/hello-world/pull/2\n', '');
+      return callback(new Error(`Unexpected command: ${key}`), '', '');
+    });
 
-    vi.stubGlobal('fetch', fetchSpy);
+    const pr = await createPullRequest({
+      cwd: '/repo',
+      ghInstallCommand: 'npm i -g gh',
+      title: 'Add feature',
+      head: 'feature',
+      base: 'main',
+    });
+
+    expect(pr).toEqual({ html_url: 'https://github.com/octo-org/hello-world/pull/2' });
+    expect(execFileMock).toHaveBeenCalledWith(
+      'sh',
+      ['-lc', 'npm i -g gh'],
+      { cwd: '/repo' },
+      expect.any(Function)
+    );
+  });
+
+  it('createPullRequest throws a login hint when gh auth is missing', async () => {
+    execFileMock.mockImplementation((command, args, _options, callback) => {
+      const key = `${command} ${(args || []).join(' ')}`;
+      if (key === 'gh --version') return callback(null, 'gh version 2.0.0', '');
+      if (key === 'gh auth status --hostname github.com') {
+        const error = new Error('exit code 1');
+        return callback(error, '', 'not logged in');
+      }
+      return callback(new Error(`Unexpected command: ${key}`), '', '');
+    });
 
     await expect(() =>
       createPullRequest({
-        token: 'token',
-        owner: 'octo-org',
-        repo: 'hello-world',
+        cwd: '/repo',
         title: 'Add feature',
-        head: 'octo-org:feature',
+        head: 'feature',
         base: 'main',
       })
-    ).rejects.toMatchObject({ message: 'Bad Request', status: 400 });
+    ).rejects.toThrow('Run "gh auth login --hostname github.com --web" and retry');
   });
 });

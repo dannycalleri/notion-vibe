@@ -6,7 +6,6 @@ import {
   getRepoRoot,
   getCurrentBranch,
   getDefaultBaseBranch,
-  getRemoteUrl,
   createWorktree,
   getWorktreeForBranch,
   pruneWorktrees,
@@ -42,7 +41,6 @@ type EnsureWorktreeInput = {
 
 type CreatePrInput = {
   config: AppConfig;
-  repoRoot: string;
   worktreePath: string;
   branchName: string;
   baseBranch: string;
@@ -188,36 +186,32 @@ async function ensureWorktree({ repoRoot, worktreeRoot, branchName, baseRef }: E
 
 async function createPrIfPossible({
   config,
-  repoRoot,
   worktreePath,
   branchName,
   baseBranch,
   title,
   context,
 }: CreatePrInput) {
-  if (!config.githubToken) {
-    warn('GITHUB_TOKEN missing; skipping PR creation.');
-    return null;
-  }
-
-  const remoteUrl = config.githubRepoUrl || await getRemoteUrl(repoRoot);
-  const repo = parseGithubRepo(remoteUrl);
-  if (!repo) {
-    warn('Unable to parse GitHub repo from remote URL; skipping PR creation.');
-    return null;
+  let repoSelector: string | undefined;
+  if (config.githubRepoUrl) {
+    const parsedRepo = parseGithubRepo(config.githubRepoUrl);
+    if (!parsedRepo) {
+      warn('Unable to parse GITHUB_REPO_URL; falling back to local git remote.');
+    } else {
+      repoSelector = `${parsedRepo.owner}/${parsedRepo.repo}`;
+    }
   }
 
   await pushBranch(worktreePath, branchName);
 
   const body = context ? `Context:\n\n${context}` : undefined;
-  const headRef = `${repo.owner}:${branchName}`;
-  log(`Creating PR on ${repo.owner}/${repo.repo} head=${headRef} base=${baseBranch}`);
+  log(`Creating PR head=${branchName} base=${baseBranch}`);
   const pr = await createPullRequest({
-    token: config.githubToken,
-    owner: repo.owner,
-    repo: repo.repo,
+    cwd: worktreePath,
+    ghInstallCommand: config.ghInstallCommand,
+    repo: repoSelector,
     title,
-    head: headRef,
+    head: branchName,
     base: baseBranch,
     body,
   });
@@ -302,7 +296,6 @@ async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }: 
     try {
       prUrl = await createPrIfPossible({
         config,
-        repoRoot,
         worktreePath,
         branchName,
         baseBranch,

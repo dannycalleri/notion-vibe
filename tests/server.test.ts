@@ -61,7 +61,7 @@ const baseConfig = {
   agentArgs: undefined,
   agentTrustLevel: 'trusted',
   codexInstallCommand: undefined,
-  githubToken: undefined,
+  ghInstallCommand: undefined,
   githubRepoUrl: undefined,
   dryRun: true,
   maxConcurrent: 1,

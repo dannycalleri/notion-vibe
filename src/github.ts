@@ -1,4 +1,4 @@
-import { GITHUB_API } from "./config.js";
+import { execFile } from 'node:child_process';
 
 type GithubRepo = {
   owner: string;
@@ -6,13 +6,18 @@ type GithubRepo = {
 };
 
 type CreatePullRequestInput = {
-  token: string;
-  owner: string;
-  repo: string;
+  cwd: string;
+  ghInstallCommand?: string;
+  repo?: string;
   title: string;
   head: string;
   base: string;
   body?: string;
+};
+
+type ExecError = NodeJS.ErrnoException & {
+  stdout?: string;
+  stderr?: string;
 };
 
 export function parseGithubRepo(remoteUrl: string | null | undefined): GithubRepo | null {
@@ -36,30 +41,167 @@ export function parseGithubRepo(remoteUrl: string | null | undefined): GithubRep
   }
 }
 
+async function runCommand(command: string, args: string[], cwd: string) {
+  return new Promise<string>((resolve, reject) => {
+    execFile(command, args, { cwd }, (error, stdout, stderr) => {
+      if (error) {
+        const err = error as ExecError;
+        err.stdout = stdout;
+        err.stderr = stderr;
+        reject(err);
+        return;
+      }
+      resolve(stdout.trim());
+    });
+  });
+}
+
+async function runShellCommand(command: string, cwd: string) {
+  if (process.platform === 'win32') {
+    return runCommand('cmd.exe', ['/d', '/s', '/c', command], cwd);
+  }
+  return runCommand('sh', ['-lc', command], cwd);
+}
+
+function isMissingCommandError(error: unknown) {
+  return typeof error === 'object' && error !== null && (error as ExecError).code === 'ENOENT';
+}
+
+async function commandExists(command: string, cwd: string) {
+  try {
+    if (process.platform === 'win32') {
+      await runCommand('where', [command], cwd);
+      return true;
+    }
+    await runShellCommand(`command -v ${command}`, cwd);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function installGh(cwd: string, installCommand?: string) {
+  if (installCommand) {
+    await runShellCommand(installCommand, cwd);
+    return;
+  }
+
+  if (process.platform === 'darwin' && await commandExists('brew', cwd)) {
+    await runShellCommand('brew install gh', cwd);
+    return;
+  }
+
+  if (process.platform === 'linux') {
+    const useSudo = typeof process.getuid === 'function' && process.getuid() !== 0 && await commandExists('sudo', cwd);
+    const prefix = useSudo ? 'sudo ' : '';
+
+    if (await commandExists('apt-get', cwd)) {
+      await runShellCommand(`${prefix}apt-get update && ${prefix}apt-get install -y gh`, cwd);
+      return;
+    }
+    if (await commandExists('dnf', cwd)) {
+      await runShellCommand(`${prefix}dnf install -y gh`, cwd);
+      return;
+    }
+    if (await commandExists('yum', cwd)) {
+      await runShellCommand(`${prefix}yum install -y gh`, cwd);
+      return;
+    }
+    if (await commandExists('pacman', cwd)) {
+      await runShellCommand(`${prefix}pacman -Sy --noconfirm github-cli`, cwd);
+      return;
+    }
+    if (await commandExists('zypper', cwd)) {
+      await runShellCommand(`${prefix}zypper --non-interactive install gh`, cwd);
+      return;
+    }
+  }
+
+  if (process.platform === 'win32') {
+    if (await commandExists('winget', cwd)) {
+      await runShellCommand('winget install --id GitHub.cli -e --source winget', cwd);
+      return;
+    }
+    if (await commandExists('choco', cwd)) {
+      await runShellCommand('choco install gh -y', cwd);
+      return;
+    }
+    if (await commandExists('scoop', cwd)) {
+      await runShellCommand('scoop install gh', cwd);
+      return;
+    }
+  }
+
+  throw new Error(
+    'GitHub CLI (gh) is required but not installed. Install it from https://cli.github.com/ or set GH_INSTALL_COMMAND.'
+  );
+}
+
+async function ensureGhInstalled(cwd: string, installCommand?: string) {
+  try {
+    await runCommand('gh', ['--version'], cwd);
+    return;
+  } catch (error) {
+    if (!isMissingCommandError(error)) throw error;
+  }
+
+  await installGh(cwd, installCommand);
+  try {
+    await runCommand('gh', ['--version'], cwd);
+  } catch (error) {
+    throw new Error(
+      `GitHub CLI installation did not produce a working "gh" binary: ${String((error as ExecError)?.message || error)}`
+    );
+  }
+}
+
+async function ensureGhAuthenticated(cwd: string) {
+  try {
+    await runCommand('gh', ['auth', 'status', '--hostname', 'github.com'], cwd);
+  } catch (error) {
+    const stderr = (error as ExecError)?.stderr?.trim();
+    const details = stderr ? ` ${stderr}` : '';
+    throw new Error(
+      `GitHub CLI is not authenticated. Run "gh auth login --hostname github.com --web" and retry.${details}`
+    );
+  }
+}
+
+function extractPullRequestUrl(output: string) {
+  const lines = output
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i];
+    if (/^https?:\/\/\S+\/pull\/\d+/.test(line)) return line;
+  }
+  const match = output.match(/https?:\/\/\S+\/pull\/\d+/);
+  return match?.[0] || null;
+}
+
 export async function createPullRequest({
-  token,
-  owner,
+  cwd,
+  ghInstallCommand,
   repo,
   title,
   head,
   base,
   body,
 }: CreatePullRequestInput): Promise<any> {
-  const res = await fetch(`${GITHUB_API}/repos/${owner}/${repo}/pulls`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/vnd.github+json',
-    },
-    body: JSON.stringify({ title, head, base, body }),
-  });
+  await ensureGhInstalled(cwd, ghInstallCommand);
+  await ensureGhAuthenticated(cwd);
 
-  if (!res.ok) {
-    const text = await res.text();
-    const error = new Error(text || `GitHub API error: ${res.status}`) as Error & { status?: number };
-    error.status = res.status;
-    throw error;
+  const args = ['pr', 'create', '--title', title, '--head', head, '--base', base, '--body', body ?? ''];
+  if (repo) {
+    args.push('--repo', repo);
   }
-  return res.json();
+
+  const output = await runCommand('gh', args, cwd);
+  const htmlUrl = extractPullRequestUrl(output);
+  if (!htmlUrl) {
+    throw new Error(`Unable to parse pull request URL from gh output: ${output}`);
+  }
+
+  return { html_url: htmlUrl };
 }
