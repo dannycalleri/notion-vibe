@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { createPullRequest as createPullRequestType, parseGithubRepo as parseGithubRepoType } from '../src/github.ts';
 
 const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn() }));
 
@@ -6,8 +7,8 @@ vi.mock('node:child_process', () => ({
   execFile: execFileMock,
 }));
 
-let createPullRequest: typeof import('../src/github.ts').createPullRequest;
-let parseGithubRepo: typeof import('../src/github.ts').parseGithubRepo;
+let createPullRequest: typeof createPullRequestType;
+let parseGithubRepo: typeof parseGithubRepoType;
 
 describe('github helpers', () => {
   beforeAll(async () => {

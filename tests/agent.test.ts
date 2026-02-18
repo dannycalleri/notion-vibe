@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as agentModule from '../src/agent.ts';
 
 const accessMock = vi.fn();
 const readdirMock = vi.fn();
@@ -13,7 +14,7 @@ vi.mock('node:child_process', () => ({
   spawn: spawnMock,
 }));
 
-let agent: typeof import('../src/agent.ts');
+let agent: typeof agentModule;
 let accessiblePaths: Set<string>;
 let readdirEntries: Map<string, Array<{ name: string; isDirectory: () => boolean }>>;
 

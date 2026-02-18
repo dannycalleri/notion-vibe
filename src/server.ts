@@ -30,7 +30,8 @@ import type { AppConfig } from './config.js';
 
 type NotionPage = {
   id: string;
-  [key: string]: any;
+  properties?: Record<string, unknown>;
+  [key: string]: unknown;
 };
 
 type EnsureWorktreeInput = {

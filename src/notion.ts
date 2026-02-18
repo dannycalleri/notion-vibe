@@ -58,12 +58,31 @@ type GetAllBlocksInput = {
 
 type Block = {
   type: string;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type DataSource = {
   properties?: Record<string, { type?: string; status?: { options?: Array<{ name: string }> } }>;
 };
+
+type NotionPageLike = {
+  properties?: Record<string, unknown>;
+};
+
+type TitleRichTextItem = {
+  plain_text?: string;
+};
+
+type TitleProperty = {
+  type: 'title';
+  title: TitleRichTextItem[];
+};
+
+function isTitleProperty(value: unknown): value is TitleProperty {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as { type?: unknown; title?: unknown };
+  return candidate.type === 'title' && Array.isArray(candidate.title);
+}
 
 async function notionRequest({ token, version, method, path, body }: NotionRequestInput) {
   const res = await fetch(`${NOTION_BASE_URL}${path}`, {
@@ -123,24 +142,11 @@ export async function listBlockChildren({ token, version, blockId, startCursor }
   });
 }
 
-export function getTitleFromPage(page: any) {
+export function getTitleFromPage(page: NotionPageLike | null | undefined) {
   const props = page?.properties ?? {};
-
-  // 'prop' is unknown, try to access safely and assert structure
-  const titleProp = Object.values(props).find(
-    (prop: any) => (
-      prop &&
-      typeof prop === 'object' &&
-      prop.type === 'title' &&
-      Array.isArray(prop.title)
-    )
-  );
-  const titleArr = (titleProp && typeof titleProp === 'object' && Array.isArray((titleProp as any).title))
-    ? (titleProp as any).title
-    : undefined;
-  
-  if (!titleArr) return 'Untitled';
-  return titleArr.map((t: any) => t?.plain_text ?? '').join('') || 'Untitled';
+  const titleProp = Object.values(props).find(isTitleProperty);
+  if (!titleProp) return 'Untitled';
+  return titleProp.title.map((item) => item?.plain_text ?? '').join('') || 'Untitled';
 }
 
 export async function getAllBlocks({ token, version, blockId }: GetAllBlocksInput) {
@@ -158,9 +164,14 @@ export function blocksToPlainText(blocks: Block[]) {
   const lines: string[] = [];
   for (const block of blocks) {
     const content = block?.[block.type];
-    const rich = content?.rich_text;
+    if (!content || typeof content !== 'object') continue;
+    const rich = (content as { rich_text?: unknown }).rich_text;
     if (Array.isArray(rich) && rich.length > 0) {
-      lines.push(rich.map((t) => t.plain_text).join(''));
+      lines.push(rich.map((item) => {
+        if (!item || typeof item !== 'object') return '';
+        const plainText = (item as { plain_text?: unknown }).plain_text;
+        return typeof plainText === 'string' ? plainText : '';
+      }).join(''));
     }
   }
   return lines.join('\n').trim();

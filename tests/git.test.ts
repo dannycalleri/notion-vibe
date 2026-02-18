@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as gitModule from '../src/git.ts';
 
 const execFileMock = vi.fn();
 
@@ -17,7 +18,7 @@ vi.mock('node:util', () => ({
   },
 }));
 
-let git: typeof import('../src/git.ts');
+let git: typeof gitModule;
 let responses: Array<string | Error> = [];
 
 beforeAll(async () => {
@@ -28,7 +29,7 @@ beforeAll(async () => {
 beforeEach(() => {
   responses = [];
   execFileMock.mockReset();
-  execFileMock.mockImplementation((cmd: string, args: string[], options: { cwd: string }, cb: Function) => {
+execFileMock.mockImplementation((cmd: string, args: string[], options: { cwd: string }, cb: (err: Error | null, stdout?: string, stderr?: string) => void) => {
     const next = responses.shift();
     if (next instanceof Error) {
       cb(next);

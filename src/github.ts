@@ -16,6 +16,10 @@ type CreatePullRequestInput = {
   body?: string;
 };
 
+type PullRequestResponse = {
+  html_url: string;
+};
+
 type ExecError = NodeJS.ErrnoException & {
   stdout?: string;
   stderr?: string;
@@ -164,7 +168,7 @@ export async function createPullRequest({
   head,
   base,
   body,
-}: CreatePullRequestInput): Promise<any> {
+}: CreatePullRequestInput): Promise<PullRequestResponse> {
   await ensureGhInstalled(cwd, ghInstallCommand);
   await ensureGhAuthenticated(cwd);
 

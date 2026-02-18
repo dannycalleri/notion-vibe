@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { startServer as startServerType } from '../src/server.ts';
 
 const gitMock = {
   getRepoRoot: vi.fn(),
@@ -40,7 +41,7 @@ vi.mock('../src/notion.js', () => notionMock);
 vi.mock('../src/github.js', () => githubMock);
 vi.mock('../src/agent.js', () => agentMock);
 
-let startServer: typeof import('../src/server.ts').startServer;
+let startServer: typeof startServerType;
 
 const baseConfig = {
   notionToken: 'token',

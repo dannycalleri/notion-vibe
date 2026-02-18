@@ -12,6 +12,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "npm run lint -- --fix",
     "prestart": "npm run build --silent",
     "start": "node dist/cli.js --",
     "build": "tsc -p tsconfig.json",
@@ -21,7 +23,11 @@
     "dotenv": "^17.2.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.21.0",
     "@types/node": "^22.13.5",
+    "eslint": "^9.21.0",
+    "globals": "^15.15.0",
+    "typescript-eslint": "^8.25.0",
     "typescript": "^5.7.3",
     "vitest": "^4.0.18"
   }

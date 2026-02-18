@@ -1,4 +1,11 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import type {
+  runCommand as runCommandType,
+  runShellCommand as runShellCommandType,
+  runParsedCommand as runParsedCommandType,
+  parseSimpleCommand as parseSimpleCommandType,
+  isMissingCommandError as isMissingCommandErrorType,
+} from '../src/shell.ts';
 
 const { execFileMock, spawnMock } = vi.hoisted(() => ({
   execFileMock: vi.fn(),
@@ -10,11 +17,11 @@ vi.mock('node:child_process', () => ({
   spawn: spawnMock,
 }));
 
-let runCommand: typeof import('../src/shell.ts').runCommand;
-let runShellCommand: typeof import('../src/shell.ts').runShellCommand;
-let runParsedCommand: typeof import('../src/shell.ts').runParsedCommand;
-let parseSimpleCommand: typeof import('../src/shell.ts').parseSimpleCommand;
-let isMissingCommandError: typeof import('../src/shell.ts').isMissingCommandError;
+let runCommand: typeof runCommandType;
+let runShellCommand: typeof runShellCommandType;
+let runParsedCommand: typeof runParsedCommandType;
+let parseSimpleCommand: typeof parseSimpleCommandType;
+let isMissingCommandError: typeof isMissingCommandErrorType;
 
 describe('shell helpers', () => {
   beforeAll(async () => {

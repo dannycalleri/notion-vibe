@@ -98,6 +98,7 @@ npm start -- --dry-run true
 Run automated checks:
 
 ```bash
+npm run lint
 npm test
 npm run typecheck
 ```
