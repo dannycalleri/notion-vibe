@@ -14,6 +14,13 @@ type RunShellCommandOptions = RunCommandOptions & {
   stdio?: 'pipe' | 'inherit';
 };
 
+export type ParsedCommand = {
+  command: string;
+  args: string[];
+};
+
+const SHELL_CONTROL_CHARS = /[|&;<>()`$\n\r]/;
+
 export async function runCommand(command: string, args: string[], { cwd, env }: RunCommandOptions) {
   return new Promise<string>((resolve, reject) => {
     const options = env ? { cwd, env } : { cwd };
@@ -54,6 +61,43 @@ export async function runShellCommand(
     return runCommand('cmd.exe', ['/d', '/s', '/c', command], { cwd, env });
   }
   return runCommand('sh', ['-lc', command], { cwd, env });
+}
+
+export function parseSimpleCommand(command: string): ParsedCommand {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    throw new Error('Command cannot be empty.');
+  }
+  if (SHELL_CONTROL_CHARS.test(trimmed)) {
+    throw new Error(`Command contains shell control characters and is not allowed: ${command}`);
+  }
+
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+  return {
+    command: tokens[0],
+    args: tokens.slice(1),
+  };
+}
+
+export async function runParsedCommand(
+  parsed: ParsedCommand,
+  { cwd, env, stdio = 'pipe' }: RunShellCommandOptions
+) {
+  if (stdio === 'inherit') {
+    return new Promise<string>((resolve, reject) => {
+      const child = spawn(parsed.command, parsed.args, {
+        cwd,
+        env,
+        stdio: 'inherit',
+      });
+      child.on('error', reject);
+      child.on('exit', (code) => {
+        if (code === 0) resolve('');
+        else reject(new Error(`Command failed with code ${code}`));
+      });
+    });
+  }
+  return runCommand(parsed.command, parsed.args, { cwd, env });
 }
 
 export function isMissingCommandError(error: unknown) {

@@ -110,17 +110,39 @@ describe('buildAgentArgs', () => {
       argsTemplate: '["exec","{prompt}"]',
     });
 
-    expect(args).toEqual(['exec', 'Fix bug\n\nContext:\nDetails']);
+    expect(args).toEqual([
+      'exec',
+      expect.stringContaining('Task:\nFix bug\n\nContext:\nDetails'),
+    ]);
   });
 
-  it('defaults to codex args when no template is provided', () => {
+  it('supports trust level placeholder in argsTemplate', () => {
+    const args = agent.buildAgentArgs({
+      command: 'codex',
+      trustLevel: 'sandboxed',
+      title: 'Fix bug',
+      argsTemplate: '["exec","--trust-level","{trustLevel}"]',
+    });
+
+    expect(args).toEqual(['exec', '--trust-level', 'sandboxed']);
+  });
+
+  it('defaults to codex args and passes trust-level when no template is provided', () => {
     const args = agent.buildAgentArgs({
       command: '/usr/local/bin/codex',
+      trustLevel: 'trusted',
       title: 'Fix bug',
       context: 'Details',
     });
 
-    expect(args).toEqual(['exec', '--sandbox', 'workspace-write', 'Fix bug\n\nContext:\nDetails']);
+    expect(args).toEqual([
+      'exec',
+      '--sandbox',
+      'workspace-write',
+      '--trust-level',
+      'trusted',
+      expect.stringContaining('Task:\nFix bug\n\nContext:\nDetails'),
+    ]);
   });
 
   it('returns empty args for non-codex commands without a template', () => {

@@ -24,7 +24,8 @@ import {
 } from './notion.js';
 import { parseGithubRepo, createPullRequest } from './github.js';
 import { locateCodexBinary, runAgent, buildAgentArgs } from './agent.js';
-import { runShellCommand } from './shell.js';
+import { runParsedCommand } from './shell.js';
+import { parseAllowlistedCodexInstallCommand } from './install-command.js';
 import type { AppConfig } from './config.js';
 
 type NotionPage = {
@@ -86,15 +87,6 @@ function warn(message: string, ...args: unknown[]) {
   console.warn(`[notion-vibe] ${message}`, ...args);
 }
 
-function formatCommand(command: string, args: string[]) {
-  const escape = (value) => {
-    const str = String(value);
-    if (/^[a-zA-Z0-9._/:-]+$/.test(str)) return str;
-    return `'${str.replace(/'/g, `'\"'\"'`)}'`;
-  };
-  return [command, ...(args || [])].map(escape).join(' ');
-}
-
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -135,7 +127,8 @@ async function ensureAgentCommand(config: AppConfig, projectDir: string) {
     return null;
   }
 
-  await runShellCommand(config.codexInstallCommand, { cwd: projectDir, stdio: 'inherit' });
+  const installCommand = parseAllowlistedCodexInstallCommand(config.codexInstallCommand);
+  await runParsedCommand(installCommand, { cwd: projectDir, stdio: 'inherit' });
   return locateCodexBinary(projectDir);
 }
 
@@ -254,7 +247,7 @@ async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }: 
       argsTemplate: config.agentArgs,
     });
 
-    log(`Agent command: ${formatCommand(agentCommand, args)}`);
+    log(`Agent command: ${agentCommand} (arguments redacted)`);
     await runAgent({
       command: agentCommand,
       args,

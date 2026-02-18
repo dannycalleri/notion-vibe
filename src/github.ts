@@ -1,4 +1,5 @@
-import { runCommand, runShellCommand, isMissingCommandError } from './shell.js';
+import { runCommand, runShellCommand, runParsedCommand, isMissingCommandError } from './shell.js';
+import { parseAllowlistedGhInstallCommand } from './install-command.js';
 
 type GithubRepo = {
   owner: string;
@@ -56,7 +57,8 @@ async function commandExists(command: string, cwd: string) {
 
 async function installGh(cwd: string, installCommand?: string) {
   if (installCommand) {
-    await runShellCommand(installCommand, { cwd });
+    const parsed = parseAllowlistedGhInstallCommand(installCommand);
+    await runParsedCommand(parsed, { cwd });
     return;
   }
 

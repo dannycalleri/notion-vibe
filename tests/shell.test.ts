@@ -12,11 +12,13 @@ vi.mock('node:child_process', () => ({
 
 let runCommand: typeof import('../src/shell.ts').runCommand;
 let runShellCommand: typeof import('../src/shell.ts').runShellCommand;
+let runParsedCommand: typeof import('../src/shell.ts').runParsedCommand;
+let parseSimpleCommand: typeof import('../src/shell.ts').parseSimpleCommand;
 let isMissingCommandError: typeof import('../src/shell.ts').isMissingCommandError;
 
 describe('shell helpers', () => {
   beforeAll(async () => {
-    ({ runCommand, runShellCommand, isMissingCommandError } = await import('../src/shell.ts'));
+    ({ runCommand, runShellCommand, runParsedCommand, parseSimpleCommand, isMissingCommandError } = await import('../src/shell.ts'));
   });
 
   afterEach(() => {
@@ -108,6 +110,31 @@ describe('shell helpers', () => {
     const pending = runShellCommand('bad command', { cwd: '/repo', stdio: 'inherit' });
     exitHandler?.(2);
     await expect(pending).rejects.toThrow('Command failed with code 2');
+  });
+
+  it('parseSimpleCommand rejects shell metacharacters', () => {
+    expect(() => parseSimpleCommand('npm i -g @openai/codex && rm -rf /')).toThrow(
+      'Command contains shell control characters'
+    );
+  });
+
+  it('runParsedCommand executes command and args without a shell', async () => {
+    execFileMock.mockImplementation((_command, _args, _options, callback) => {
+      callback(null, 'ok\n', '');
+    });
+
+    const output = await runParsedCommand(
+      { command: 'brew', args: ['install', 'gh'] },
+      { cwd: '/repo' }
+    );
+
+    expect(output).toBe('ok');
+    expect(execFileMock).toHaveBeenCalledWith(
+      'brew',
+      ['install', 'gh'],
+      { cwd: '/repo' },
+      expect.any(Function)
+    );
   });
 
   it('isMissingCommandError detects ENOENT only', () => {
