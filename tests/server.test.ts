@@ -60,7 +60,7 @@ const baseConfig = {
   baseBranch: undefined,
   agentCommand: 'codex',
   agentArgs: undefined,
-  agentTrustLevel: 'trusted',
+  agentApprovalPolicy: 'never',
   codexInstallCommand: undefined,
   ghInstallCommand: undefined,
   githubRepoUrl: undefined,

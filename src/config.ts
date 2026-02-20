@@ -15,7 +15,7 @@ export type AppConfig = {
   baseBranch?: string;
   agentCommand?: string;
   agentArgs?: string;
-  agentTrustLevel: string;
+  agentApprovalPolicy: string;
   codexInstallCommand?: string;
   ghInstallCommand?: string;
   githubRepoUrl?: string;
@@ -87,7 +87,9 @@ export function loadConfig(argv: string[]): AppConfig {
     baseBranch: args['base-branch'] ?? process.env.BASE_BRANCH,
     agentCommand: args['agent-command'] ?? process.env.AGENT_COMMAND,
     agentArgs: args['agent-args'] ?? process.env.AGENT_ARGS,
-    agentTrustLevel: args['agent-trust-level'] ?? process.env.CODEX_TRUST_LEVEL ?? 'trusted',
+    agentApprovalPolicy: args['agent-approval-policy']
+      ?? process.env.CODEX_APPROVAL_POLICY
+      ?? 'never',
     codexInstallCommand: args['codex-install-command'] ?? process.env.CODEX_INSTALL_COMMAND,
     ghInstallCommand: args['gh-install-command'] ?? process.env.GH_INSTALL_COMMAND,
     githubRepoUrl: args['github-repo-url'] ?? process.env.GITHUB_REPO_URL,

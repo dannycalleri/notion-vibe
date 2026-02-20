@@ -12,7 +12,7 @@ type RunAgentInput = {
 
 type BuildAgentArgsInput = {
   command: string;
-  trustLevel?: string;
+  approvalPolicy?: string;
   title: string;
   context?: string;
   argsTemplate?: string;
@@ -122,9 +122,9 @@ function buildPrompt(title: string, context?: string) {
   ].join('\n');
 }
 
-export function buildAgentArgs({ command, trustLevel, title, context, argsTemplate }: BuildAgentArgsInput) {
+export function buildAgentArgs({ command, approvalPolicy, title, context, argsTemplate }: BuildAgentArgsInput) {
   const prompt = buildPrompt(title, context);
-  const normalizedTrustLevel = trustLevel?.trim();
+  const normalizedApprovalPolicy = approvalPolicy?.trim() || 'never';
   if (argsTemplate) {
     let tokens = [];
     const trimmed = argsTemplate.trim();
@@ -141,21 +141,19 @@ export function buildAgentArgs({ command, trustLevel, title, context, argsTempla
     return tokens.map((token) => String(token)
       .replaceAll('{title}', title)
       .replaceAll('{context}', context ?? '')
-      .replaceAll('{trustLevel}', normalizedTrustLevel ?? '')
+      .replaceAll('{approvalPolicy}', normalizedApprovalPolicy)
       .replaceAll('{prompt}', prompt));
   }
 
   if (path.basename(command) === 'codex') {
-    const args = [
+    return [
+      '--ask-for-approval',
+      normalizedApprovalPolicy,
       'exec',
       '--sandbox',
       'workspace-write',
+      prompt,
     ];
-    if (normalizedTrustLevel) {
-      args.push('--trust-level', normalizedTrustLevel);
-    }
-    args.push(prompt);
-    return args;
   }
   return [];
 }

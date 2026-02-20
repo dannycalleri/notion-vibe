@@ -105,7 +105,7 @@ describe('buildAgentArgs', () => {
   it('substitutes tokens from JSON argsTemplate', () => {
     const args = agent.buildAgentArgs({
       command: 'codex',
-      trustLevel: 'trusted',
+      approvalPolicy: 'never',
       title: 'Fix bug',
       context: 'Details',
       argsTemplate: '["exec","{prompt}"]',
@@ -117,31 +117,48 @@ describe('buildAgentArgs', () => {
     ]);
   });
 
-  it('supports trust level placeholder in argsTemplate', () => {
+  it('supports approval policy placeholder in argsTemplate', () => {
     const args = agent.buildAgentArgs({
       command: 'codex',
-      trustLevel: 'sandboxed',
+      approvalPolicy: 'on-request',
       title: 'Fix bug',
-      argsTemplate: '["exec","--trust-level","{trustLevel}"]',
+      argsTemplate: '["--ask-for-approval","{approvalPolicy}","exec"]',
     });
 
-    expect(args).toEqual(['exec', '--trust-level', 'sandboxed']);
+    expect(args).toEqual(['--ask-for-approval', 'on-request', 'exec']);
   });
 
-  it('defaults to codex args and passes trust-level when no template is provided', () => {
+  it('defaults to codex args and uses modern approval policy when no template is provided', () => {
     const args = agent.buildAgentArgs({
       command: '/usr/local/bin/codex',
-      trustLevel: 'trusted',
+      approvalPolicy: 'never',
       title: 'Fix bug',
       context: 'Details',
     });
 
     expect(args).toEqual([
+      '--ask-for-approval',
+      'never',
       'exec',
       '--sandbox',
       'workspace-write',
-      '--trust-level',
-      'trusted',
+      expect.stringContaining('Task:\nFix bug\n\nContext:\nDetails'),
+    ]);
+  });
+
+  it('defaults approval policy to never when omitted', () => {
+    const args = agent.buildAgentArgs({
+      command: '/usr/local/bin/codex',
+      title: 'Fix bug',
+      context: 'Details',
+    });
+
+    expect(args).toEqual([
+      '--ask-for-approval',
+      'never',
+      'exec',
+      '--sandbox',
+      'workspace-write',
       expect.stringContaining('Task:\nFix bug\n\nContext:\nDetails'),
     ]);
   });

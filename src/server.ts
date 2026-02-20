@@ -242,7 +242,7 @@ async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }: 
   if (!config.dryRun) {
     const args = buildAgentArgs({
       command: agentCommand,
-      trustLevel: config.agentTrustLevel,
+      approvalPolicy: config.agentApprovalPolicy,
       title,
       context,
       argsTemplate: config.agentArgs,
