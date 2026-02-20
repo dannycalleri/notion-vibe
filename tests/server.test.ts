@@ -47,6 +47,15 @@ vi.mock('../src/github.js', () => githubMock);
 vi.mock('../src/agent.js', () => agentMock);
 
 let startServer: typeof startServerType;
+let scheduledJobs: Array<Promise<unknown>> = [];
+
+async function flushScheduledJobs() {
+  while (scheduledJobs.length > 0) {
+    const jobs = scheduledJobs;
+    scheduledJobs = [];
+    await Promise.allSettled(jobs);
+  }
+}
 
 const baseConfig = {
   notionToken: 'token',
@@ -82,8 +91,9 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(globalThis, 'setInterval').mockImplementation(() => 0 as unknown as NodeJS.Timeout);
-  vi.spyOn(globalThis, 'setImmediate').mockImplementation((fn: (...args: unknown[]) => void, ...args: unknown[]) => {
-    fn(...args);
+  vi.spyOn(globalThis, 'setImmediate').mockImplementation((fn: (...args: unknown[]) => unknown, ...args: unknown[]) => {
+    const job = Promise.resolve().then(() => fn(...args));
+    scheduledJobs.push(job);
     return 0 as unknown as NodeJS.Immediate;
   });
 
@@ -107,6 +117,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  scheduledJobs = [];
 });
 
 describe('startServer', () => {
@@ -201,7 +212,7 @@ describe('startServer', () => {
       projectDir: repoRoot,
       githubRepoUrl: 'https://github.com/octo-org/hello',
     });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushScheduledJobs();
 
     expect(agentMock.runAgent).not.toHaveBeenCalled();
     expect(githubMock.createPullRequest).toHaveBeenCalledTimes(1);
@@ -238,7 +249,7 @@ describe('startServer', () => {
       worktreeRoot,
       projectDir: repoRoot,
     });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushScheduledJobs();
 
     expect(agentMock.runAgent).toHaveBeenCalledTimes(1);
     expect(agentMock.buildAgentArgs).toHaveBeenCalledWith(expect.objectContaining({
