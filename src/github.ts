@@ -20,9 +20,21 @@ type PullRequestResponse = {
   html_url: string;
 };
 
+type PullRequestFeedbackInput = {
+  cwd: string;
+  ghInstallCommand?: string;
+  prUrl: string;
+};
+
 type ExecError = NodeJS.ErrnoException & {
   stdout?: string;
   stderr?: string;
+};
+
+type PullRequestRef = {
+  owner: string;
+  repo: string;
+  number: number;
 };
 
 export function parseGithubRepo(remoteUrl: string | null | undefined): GithubRepo | null {
@@ -158,6 +170,69 @@ function extractPullRequestUrl(output: string) {
   }
   const match = output.match(/https?:\/\/\S+\/pull\/\d+/);
   return match?.[0] || null;
+}
+
+function parsePullRequestUrl(prUrl: string): PullRequestRef | null {
+  const match = prUrl.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:[/?#].*)?$/i);
+  if (!match) return null;
+  return {
+    owner: decodeURIComponent(match[1]),
+    repo: decodeURIComponent(match[2]).replace(/\.git$/i, ''),
+    number: Number(match[3]),
+  };
+}
+
+function parseJsonArray(output: string, source: string) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output || '[]');
+  } catch {
+    throw new Error(`Invalid JSON from ${source}.`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(`Expected array JSON from ${source}.`);
+  }
+  return parsed;
+}
+
+function collectBodies(items: unknown[]) {
+  return items
+    .map((item) => {
+      if (!item || typeof item !== 'object') return '';
+      const body = (item as { body?: unknown }).body;
+      return typeof body === 'string' ? body.trim() : '';
+    })
+    .filter(Boolean);
+}
+
+export async function getPullRequestFeedback({
+  cwd,
+  ghInstallCommand,
+  prUrl,
+}: PullRequestFeedbackInput): Promise<string[]> {
+  const ref = parsePullRequestUrl(prUrl);
+  if (!ref) {
+    throw new Error(`Unsupported GitHub PR URL format: ${prUrl}`);
+  }
+
+  await ensureGhInstalled(cwd, ghInstallCommand);
+  await ensureGhAuthenticated(cwd);
+
+  const issueCommentsPath = `repos/${ref.owner}/${ref.repo}/issues/${ref.number}/comments?per_page=100`;
+  const reviewCommentsPath = `repos/${ref.owner}/${ref.repo}/pulls/${ref.number}/comments?per_page=100`;
+  const reviewsPath = `repos/${ref.owner}/${ref.repo}/pulls/${ref.number}/reviews?per_page=100`;
+
+  const [issueCommentsRaw, reviewCommentsRaw, reviewsRaw] = await Promise.all([
+    runCommand('gh', ['api', issueCommentsPath], { cwd }),
+    runCommand('gh', ['api', reviewCommentsPath], { cwd }),
+    runCommand('gh', ['api', reviewsPath], { cwd }),
+  ]);
+
+  const issueBodies = collectBodies(parseJsonArray(issueCommentsRaw, issueCommentsPath));
+  const reviewCommentBodies = collectBodies(parseJsonArray(reviewCommentsRaw, reviewCommentsPath));
+  const reviewBodies = collectBodies(parseJsonArray(reviewsRaw, reviewsPath));
+
+  return [...new Set([...issueBodies, ...reviewCommentBodies, ...reviewBodies])];
 }
 
 export async function createPullRequest({

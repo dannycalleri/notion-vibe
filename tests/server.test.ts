@@ -1,5 +1,9 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { startServer as startServerType } from '../src/server.ts';
+import os from 'node:os';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 
 const gitMock = {
   getRepoRoot: vi.fn(),
@@ -28,6 +32,7 @@ const notionMock = {
 const githubMock = {
   parseGithubRepo: vi.fn(),
   createPullRequest: vi.fn(),
+  getPullRequestFeedback: vi.fn(),
 };
 
 const agentMock = {
@@ -77,6 +82,10 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(globalThis, 'setInterval').mockImplementation(() => 0 as unknown as NodeJS.Timeout);
+  vi.spyOn(globalThis, 'setImmediate').mockImplementation((fn: (...args: unknown[]) => void, ...args: unknown[]) => {
+    fn(...args);
+    return 0 as unknown as NodeJS.Immediate;
+  });
 
   gitMock.getRepoRoot.mockResolvedValue('/repo');
   gitMock.getDefaultBaseBranch.mockResolvedValue('main');
@@ -86,10 +95,14 @@ beforeEach(() => {
   notionMock.getDataSource.mockResolvedValue({ properties: {} });
   notionMock.queryDataSource.mockResolvedValue({ results: [] });
   notionMock.validateDataSourceSchema.mockReturnValue([]);
+  notionMock.getTitleFromPage.mockReturnValue('Task title');
+  notionMock.getAllBlocks.mockResolvedValue([{ type: 'paragraph', paragraph: { rich_text: [{ plain_text: 'Card body' }] } }]);
+  notionMock.blocksToPlainText.mockReturnValue('Card body');
 
   agentMock.locateCodexBinary.mockResolvedValue('/usr/bin/codex');
   agentMock.runAgent.mockResolvedValue(undefined);
   agentMock.buildAgentArgs.mockReturnValue([]);
+  githubMock.getPullRequestFeedback.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -155,5 +168,88 @@ describe('startServer', () => {
 
     expect(warnSpy).toHaveBeenCalledWith('[turbo-vibe] Notion database validation issues:');
     expect(warnSpy).toHaveBeenCalledWith('[turbo-vibe] - Issue 1');
+  });
+
+  it('retries PR creation without rerunning agent when content is unchanged and PR has no comments', async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'turbo-vibe-retry-'));
+    const worktreeRoot = '.turbo-vibe/worktrees';
+    const worktreePath = path.join(repoRoot, worktreeRoot, 'notion/task-title-page1234');
+    const statePath = path.join(repoRoot, worktreeRoot, '.task-state', 'page-1234.json');
+
+    await mkdir(worktreePath, { recursive: true });
+    await mkdir(path.dirname(statePath), { recursive: true });
+    const contentHash = createHash('sha256').update('Task title\n\nCard body').digest('hex');
+    await writeFile(
+      statePath,
+      `${JSON.stringify({ contentHash })}\n`,
+      'utf8'
+    );
+
+    gitMock.getRepoRoot.mockResolvedValue(repoRoot);
+    gitMock.getWorktreeForBranch.mockResolvedValue({ path: worktreePath, branch: 'notion/task-title-page1234' });
+    gitMock.getStatusPorcelain.mockResolvedValue('');
+    notionMock.queryDataSource.mockResolvedValueOnce({
+      results: [{ id: 'page-1234', properties: { PR: { type: 'url', url: null } } }],
+    });
+    githubMock.createPullRequest.mockResolvedValue({ html_url: 'https://github.com/octo-org/hello/pull/1' });
+    githubMock.parseGithubRepo.mockReturnValue({ owner: 'octo-org', repo: 'hello' });
+
+    await startServer({
+      ...baseConfig,
+      dryRun: false,
+      worktreeRoot,
+      projectDir: repoRoot,
+      githubRepoUrl: 'https://github.com/octo-org/hello',
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(agentMock.runAgent).not.toHaveBeenCalled();
+    expect(githubMock.createPullRequest).toHaveBeenCalledTimes(1);
+    expect(notionMock.updatePage).toHaveBeenCalledWith(expect.objectContaining({
+      properties: expect.objectContaining({
+        PR: { url: 'https://github.com/octo-org/hello/pull/1' },
+      }),
+    }));
+  });
+
+  it('reruns agent with PR feedback when comments exist and keeps existing PR URL', async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'turbo-vibe-feedback-'));
+    const worktreeRoot = '.turbo-vibe/worktrees';
+    const worktreePath = path.join(repoRoot, worktreeRoot, 'notion/task-title-page1234');
+
+    await mkdir(worktreePath, { recursive: true });
+
+    gitMock.getRepoRoot.mockResolvedValue(repoRoot);
+    gitMock.getWorktreeForBranch.mockResolvedValue({ path: worktreePath, branch: 'notion/task-title-page1234' });
+    gitMock.getStatusPorcelain.mockResolvedValue('M src/index.ts');
+    notionMock.queryDataSource.mockResolvedValueOnce({
+      results: [{
+        id: 'page-1234',
+        properties: {
+          PR: { type: 'url', url: 'https://github.com/octo-org/hello/pull/9' },
+        },
+      }],
+    });
+    githubMock.getPullRequestFeedback.mockResolvedValue(['Please add a test for edge case X']);
+
+    await startServer({
+      ...baseConfig,
+      dryRun: false,
+      worktreeRoot,
+      projectDir: repoRoot,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(agentMock.runAgent).toHaveBeenCalledTimes(1);
+    expect(agentMock.buildAgentArgs).toHaveBeenCalledWith(expect.objectContaining({
+      context: expect.stringContaining('GitHub PR feedback:'),
+    }));
+    expect(gitMock.pushBranch).toHaveBeenCalledTimes(1);
+    expect(githubMock.createPullRequest).not.toHaveBeenCalled();
+    expect(notionMock.updatePage).toHaveBeenCalledWith(expect.objectContaining({
+      properties: expect.objectContaining({
+        PR: { url: 'https://github.com/octo-org/hello/pull/9' },
+      }),
+    }));
   });
 });

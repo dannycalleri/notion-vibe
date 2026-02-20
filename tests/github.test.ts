@@ -1,5 +1,9 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { createPullRequest as createPullRequestType, parseGithubRepo as parseGithubRepoType } from '../src/github.ts';
+import type {
+  createPullRequest as createPullRequestType,
+  parseGithubRepo as parseGithubRepoType,
+  getPullRequestFeedback as getPullRequestFeedbackType,
+} from '../src/github.ts';
 
 const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn() }));
 
@@ -9,10 +13,11 @@ vi.mock('node:child_process', () => ({
 
 let createPullRequest: typeof createPullRequestType;
 let parseGithubRepo: typeof parseGithubRepoType;
+let getPullRequestFeedback: typeof getPullRequestFeedbackType;
 
 describe('github helpers', () => {
   beforeAll(async () => {
-    ({ createPullRequest, parseGithubRepo } = await import('../src/github.ts'));
+    ({ createPullRequest, parseGithubRepo, getPullRequestFeedback } = await import('../src/github.ts'));
   });
 
   afterEach(() => {
@@ -148,5 +153,34 @@ describe('github helpers', () => {
         base: 'main',
       })
     ).rejects.toThrow('Run "gh auth login --hostname github.com --web" and retry');
+  });
+
+  it('getPullRequestFeedback returns combined PR comments', async () => {
+    execFileMock.mockImplementation((command, args, _options, callback) => {
+      const key = `${command} ${(args || []).join(' ')}`;
+      if (key === 'gh --version') return callback(null, 'gh version 2.0.0', '');
+      if (key === 'gh auth status --hostname github.com') return callback(null, 'ok', '');
+      if (key.includes('gh api repos/octo-org/hello-world/issues/12/comments?per_page=100')) {
+        return callback(null, JSON.stringify([{ body: 'Please add docs' }]), '');
+      }
+      if (key.includes('gh api repos/octo-org/hello-world/pulls/12/comments?per_page=100')) {
+        return callback(null, JSON.stringify([{ body: 'Nit: rename this variable' }]), '');
+      }
+      if (key.includes('gh api repos/octo-org/hello-world/pulls/12/reviews?per_page=100')) {
+        return callback(null, JSON.stringify([{ body: 'Overall looks good' }]), '');
+      }
+      return callback(new Error(`Unexpected command: ${key}`), '', '');
+    });
+
+    const comments = await getPullRequestFeedback({
+      cwd: '/repo',
+      prUrl: 'https://github.com/octo-org/hello-world/pull/12',
+    });
+
+    expect(comments).toEqual([
+      'Please add docs',
+      'Nit: rename this variable',
+      'Overall looks good',
+    ]);
   });
 });

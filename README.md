@@ -86,6 +86,7 @@ node dist/cli.js --notion-db-id YOUR_DB_ID --project-dir /path/to/your/project
    - Commits and pushes changes
    - Opens a GitHub PR
    - Updates the Notion card to `In review` and fills the PR URL
+   - If a card is moved back to `In progress`, unchanged content with no PR comments triggers a PR-only retry (no agent rerun); PR comments trigger a rerun with feedback appended to context
 
 ## Testing Safely
 

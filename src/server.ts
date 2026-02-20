@@ -1,4 +1,5 @@
-import { access, mkdir } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import readline from 'node:readline';
 import {
@@ -22,7 +23,7 @@ import {
   blocksToPlainText,
   validateDataSourceSchema,
 } from './notion.js';
-import { parseGithubRepo, createPullRequest } from './github.js';
+import { parseGithubRepo, createPullRequest, getPullRequestFeedback } from './github.js';
 import { locateCodexBinary, runAgent, buildAgentArgs } from './agent.js';
 import { runParsedCommand } from './shell.js';
 import { parseAllowlistedCodexInstallCommand } from './install-command.js';
@@ -65,6 +66,10 @@ type HandlePageInput = {
   agentCommand: string;
 };
 
+type TaskState = {
+  contentHash: string;
+};
+
 type PollDatabaseInput = {
   config: AppConfig;
   dataSourceId: string;
@@ -104,6 +109,56 @@ function buildBranchName(title: string, pageId: string) {
 
 function getWorktreePath(repoRoot: string, worktreeRoot: string, branchName: string) {
   return path.join(repoRoot, worktreeRoot, branchName);
+}
+
+function getTaskStatePath(repoRoot: string, worktreeRoot: string, pageId: string) {
+  return path.join(repoRoot, worktreeRoot, '.task-state', `${pageId}.json`);
+}
+
+function hashTaskContent(title: string, context: string) {
+  return createHash('sha256').update(`${title}\n\n${context}`).digest('hex');
+}
+
+function getPagePrUrl(page: NotionPage, prProperty: string) {
+  const properties = page.properties;
+  if (!properties || typeof properties !== 'object') return null;
+  const pr = properties[prProperty];
+  if (!pr || typeof pr !== 'object') return null;
+  const url = (pr as { url?: unknown }).url;
+  if (typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  return trimmed || null;
+}
+
+function buildFeedbackContext(context: string, feedback: string[]) {
+  if (feedback.length === 0) return context;
+  const feedbackLines = feedback.map((item) => `- ${item}`).join('\n');
+  return `${context}\n\nGitHub PR feedback:\n${feedbackLines}`.trim();
+}
+
+async function loadTaskState(repoRoot: string, worktreeRoot: string, pageId: string): Promise<TaskState | null> {
+  const statePath = getTaskStatePath(repoRoot, worktreeRoot, pageId);
+  let raw: string;
+  try {
+    raw = await readFile(statePath, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return null;
+    throw error;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as TaskState;
+    if (!parsed || typeof parsed.contentHash !== 'string') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function saveTaskState(repoRoot: string, worktreeRoot: string, pageId: string, state: TaskState) {
+  const statePath = getTaskStatePath(repoRoot, worktreeRoot, pageId);
+  await mkdir(path.dirname(statePath), { recursive: true });
+  await writeFile(statePath, `${JSON.stringify(state)}\n`, 'utf8');
 }
 
 async function promptYesNo(question: string) {
@@ -222,6 +277,26 @@ async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }: 
     blockId: page.id,
   });
   const context = blocksToPlainText(blocks);
+  const contentHash = hashTaskContent(title, context);
+  const previousState = await loadTaskState(repoRoot, config.worktreeRoot, page.id);
+  const existingPrUrl = getPagePrUrl(page, config.prProperty);
+  let feedback: string[] = [];
+  if (!config.dryRun && existingPrUrl) {
+    try {
+      feedback = await getPullRequestFeedback({
+        cwd: repoRoot,
+        ghInstallCommand: config.ghInstallCommand,
+        prUrl: existingPrUrl,
+      });
+    } catch (err) {
+      warn('Unable to load PR feedback; forcing agent rerun:', err?.message || err);
+    }
+  }
+  const hasFeedback = feedback.length > 0;
+  const shouldSkipAgent = 
+    !hasFeedback
+    && previousState?.contentHash === contentHash;
+  const agentContext = hasFeedback ? buildFeedbackContext(context, feedback) : context;
 
   const branchName = buildBranchName(title, page.id);
   const baseRef = baseBranch.startsWith('origin/') ? baseBranch : `origin/${baseBranch}`;
@@ -239,12 +314,14 @@ async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }: 
     throw new Error(`Worktree path not found: ${worktreePath}`);
   }
 
-  if (!config.dryRun) {
+  if (shouldSkipAgent) {
+    log('Skipping agent run: card content unchanged and no PR feedback comments.');
+  } else if (!config.dryRun) {
     const args = buildAgentArgs({
       command: agentCommand,
       approvalPolicy: config.agentApprovalPolicy,
       title,
-      context,
+      context: agentContext,
       argsTemplate: config.agentArgs,
     });
 
@@ -255,23 +332,30 @@ async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }: 
       cwd: worktreePath,
       env: {
         TASK_TITLE: title,
-        TASK_CONTEXT: context,
+        TASK_CONTEXT: agentContext,
         NOTION_PAGE_ID: page.id,
       },
     });
+    await saveTaskState(repoRoot, config.worktreeRoot, page.id, { contentHash });
   } else {
     log('Dry run enabled; skipping agent execution.');
   }
 
   const status = await getStatusPorcelain(worktreePath);
-  if (!status) {
+  if (!status && !shouldSkipAgent) {
     warn('No git changes detected after agent run.');
   } else if (!config.dryRun) {
-    await addAllAndCommit(worktreePath, `notion: ${title} (${page.id})`);
+    if (status) {
+      await addAllAndCommit(worktreePath, `notion: ${title} (${page.id})`);
+    }
+    if (existingPrUrl && status) {
+      await pushBranch(worktreePath, branchName);
+    }
   }
 
-  let prUrl = null;
-  if (status && !config.dryRun) {
+  let prUrl = existingPrUrl;
+  const shouldCreatePr = !config.dryRun && !prUrl && (Boolean(status) || shouldSkipAgent);
+  if (shouldCreatePr) {
     try {
       prUrl = await createPrIfPossible({
         config,
