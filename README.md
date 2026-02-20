@@ -104,6 +104,24 @@ npm test
 npm run typecheck
 ```
 
+## CI/CD (GitHub Actions + npm Trusted Publishing)
+
+- Workflow file: `.github/workflows/ci.yml`
+- PRs: runs tests on every pull request.
+- Mainline merges: runs tests on pushes to `main`/`master`.
+- Publish: after tests pass on `main`/`master`, publishes to npm with provenance.
+
+Trusted publishing setup (one-time in npm):
+
+1. In npmjs.com package settings, add a Trusted Publisher for this GitHub repo.
+2. Set workflow filename exactly to `ci.yml` (case-sensitive).
+3. Keep publishing on GitHub-hosted runners (required by npm trusted publishing).
+
+Notes:
+
+- No `NPM_TOKEN` secret is needed for `npm publish` when trusted publishing is configured.
+- If dependencies are private npm packages, `npm ci` may still need a separate read-only npm token.
+
 ## Notes
 
 - Notion API `2025-09-03` splits databases into data sources. The database response includes a `data_sources` array; you must query a specific data source for rows and schema.
