@@ -11,7 +11,7 @@ coverage/
 .svelte-kit/
 .env
 .env.*
-.notion-vibe/
+.turbo-vibe/
 *.log
 npm-debug.log*
 yarn-debug.log*

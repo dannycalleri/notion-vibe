@@ -1,5 +1,5 @@
 {
-  "name": "notion-vibe",
+  "name": "turbo-vibe",
   "version": "1.0.0",
   "description": "",
   "license": "ISC",
@@ -7,7 +7,7 @@
   "type": "module",
   "main": "dist/cli.js",
   "bin": {
-    "notion-vibe": "dist/cli.js"
+    "turbo-vibe": "dist/cli.js"
   },
   "scripts": {
     "test": "vitest run",

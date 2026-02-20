@@ -56,7 +56,7 @@ const baseConfig = {
   statusDone: 'Done',
   prProperty: 'PR',
   pollIntervalMs: 1000,
-  worktreeRoot: '.notion-vibe/worktrees',
+  worktreeRoot: '.turbo-vibe/worktrees',
   baseBranch: undefined,
   agentCommand: 'codex',
   agentArgs: undefined,
@@ -153,7 +153,7 @@ describe('startServer', () => {
 
     await startServer(baseConfig);
 
-    expect(warnSpy).toHaveBeenCalledWith('[notion-vibe] Notion database validation issues:');
-    expect(warnSpy).toHaveBeenCalledWith('[notion-vibe] - Issue 1');
+    expect(warnSpy).toHaveBeenCalledWith('[turbo-vibe] Notion database validation issues:');
+    expect(warnSpy).toHaveBeenCalledWith('[turbo-vibe] - Issue 1');
   });
 });

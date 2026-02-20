@@ -1,4 +1,4 @@
-# notion-vibe
+# turbo-vibe
 
 Run a local server that watches a Notion Kanban database, executes Codex (or another agent) in an isolated git worktree, opens a GitHub PR, and updates the Notion card to "In review" with the PR URL.
 
@@ -25,14 +25,14 @@ npm start -- --project-dir /path/to/your/project
 Or build once and run from the target project root (if you want `PROJECT_DIR` to default to `cwd`):
 
 ```bash
-npm --prefix /path/to/notion-vibe run build
-node /path/to/notion-vibe/dist/cli.js
+npm --prefix /path/to/turbo-vibe run build
+node /path/to/turbo-vibe/dist/cli.js
 ```
 
 To run against a different project directory, use `--project-dir`:
 
 ```bash
-node /path/to/notion-vibe/dist/cli.js --project-dir /path/to/your/project
+node /path/to/turbo-vibe/dist/cli.js --project-dir /path/to/your/project
 ```
 
 ## Configuration
@@ -57,7 +57,7 @@ NOTION_STATUS_IN_REVIEW="In review"
 NOTION_STATUS_DONE="Done"
 NOTION_PR_PROPERTY="PR"
 POLL_INTERVAL_MS="30000"
-WORKTREE_ROOT=".notion-vibe/worktrees"
+WORKTREE_ROOT=".turbo-vibe/worktrees"
 BASE_BRANCH="main"
 AGENT_COMMAND="codex"
 AGENT_ARGS='["exec","--sandbox","workspace-write","--trust-level","{trustLevel}","{prompt}"]'
