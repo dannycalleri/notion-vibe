@@ -2,7 +2,7 @@
 
 ## Overview
 
-`turbo-vibe` is a headless orchestrator for running parallel coding agents that attaches to your existing kanban workflow.
+`turbo-vibe` is a headless orchestrator for running parallel coding agents that attaches to your existing kanban.
 
 It currently supports:
 
@@ -10,6 +10,15 @@ It currently supports:
 - Codex as the coding agent
 
 The goal is to offer engineers a flexible, AI-powered tool for product management.
+
+### Features
+
+- Headless tool that attaches to your existing Notion kanban.
+- Run parallel tasks with configurable concurrency.
+- Agent execution happens in isolated git worktrees per task.
+- Automatic branch, commit, push, and GitHub PR creation.
+- Automatic Notion card update.
+- Dry-run mode for validating control flow without side effects.
 
 ## Installation
 
@@ -26,7 +35,7 @@ Minimum requirements:
   - `Status` (status property)
   - `PR` (URL property)
 
-Configure environment variables (typically in `.env`):
+Configure environment variables (`.env` file):
 
 ```bash
 NOTION_TOKEN="..."
