@@ -9,7 +9,7 @@ It currently supports:
 - Notion as the kanban system
 - Codex as the coding agent
 
-The goal is to power up engineer-led product management in the age of AI.
+The goal is to offer engineers a flexible, AI-powered tool for product management.
 
 ## Installation
 
