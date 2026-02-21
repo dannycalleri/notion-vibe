@@ -56,12 +56,14 @@ jobs:
       - name: Build package
         run: npm run build
 
+      - name: Verify OIDC context for trusted publishing
+        run: |
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ] || [ -z "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then
+            echo "Trusted publishing OIDC context is missing. Ensure id-token: write is granted for this job."
+            exit 1
+          fi
+
       - name: Release
-        id: semantic
-        uses: cycjimmy/semantic-release-action@v6
-        with:
-          semantic_version: 25.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
+        run: npx semantic-release@25.0.2

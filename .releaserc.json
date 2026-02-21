@@ -1,7 +1,6 @@
 {
   "branches": [
-    "main",
-    "master"
+    "main"
   ],
   "tagFormat": "v${version}",
   "plugins": [
@@ -13,12 +12,6 @@
         "npmPublish": true
       }
     ],
-    [
-      "@semantic-release/github",
-      {
-        "successComment": false,
-        "failComment": false
-      }
-    ]
+    "@semantic-release/github"
   ]
 }
