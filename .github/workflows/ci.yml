@@ -31,11 +31,15 @@ jobs:
     needs: test
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     permissions:
-      contents: read
+      contents: write
+      issues: write
+      pull-requests: write
       id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js for npm publish
         uses: actions/setup-node@v4
@@ -53,17 +57,17 @@ jobs:
       - name: Build package
         run: npm run build
 
-      - name: Check whether this version is already published
-        id: version_check
-        run: |
-          PACKAGE_NAME=$(node --eval "console.log(JSON.parse(require('fs').readFileSync('package.json', 'utf8')).name)")
-          PACKAGE_VERSION=$(node --eval "console.log(JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version)")
-          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
-            echo "published=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "published=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish package to npm
-        if: steps.version_check.outputs.published == 'false'
-        run: npm publish --provenance --access public
+      - name: Release
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v5
+        with:
+          semantic_version: 24
+          extra_plugins: |
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
+            @semantic-release/npm
+            @semantic-release/github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
