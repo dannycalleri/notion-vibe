@@ -1,5 +1,8 @@
 # turbo-vibe (beta)
 
+[![npm version](https://img.shields.io/npm/v/turbo-vibe)](https://www.npmjs.com/package/turbo-vibe)
+[![build](https://github.com/dannycalleri/turbo-vibe/actions/workflows/ci.yml/badge.svg)](https://github.com/dannycalleri/turbo-vibe/actions/workflows/ci.yml)
+
 ## Overview
 
 `turbo-vibe` is a headless orchestrator for running parallel coding agents that attaches to your existing kanban.
