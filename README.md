@@ -55,7 +55,7 @@ npx turbo-vibe --project-dir /path/to/your/project --dry-run true
 ## Support
 
 - Open an issue in this repository for bugs and feature requests.
-- Include your command, environment variables used (redacted), and logs when reporting issues.
+- Include your command, environment variables used, and logs when reporting issues.
 
 ## Contributing
 
@@ -67,7 +67,7 @@ Contributions are welcome.
 4. Run lint, typecheck, and tests.
 5. Open a pull request with a clear summary and verification steps.
 
-Conventional Commits are preferred.
+This project uses [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/); make sure your commits respect that.
 
 ## Development
 
