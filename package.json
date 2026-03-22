@@ -4,6 +4,10 @@
   "description": "",
   "license": "Apache-2.0",
   "author": "Daniele Calleri",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dannycalleri/notion-vibe"
+  },
   "type": "module",
   "main": "dist/cli.js",
   "bin": {
