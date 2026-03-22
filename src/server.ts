@@ -86,11 +86,11 @@ type StartQueueInput = {
 };
 
 function log(message: string, ...args: unknown[]) {
-  console.log(`[turbo-vibe] ${message}`, ...args);
+  console.log(`[notion-vibe] ${message}`, ...args);
 }
 
 function warn(message: string, ...args: unknown[]) {
-  console.warn(`[turbo-vibe] ${message}`, ...args);
+  console.warn(`[notion-vibe] ${message}`, ...args);
 }
 
 function slugify(value: string) {

@@ -1,11 +1,11 @@
-# turbo-vibe (beta)
+# notion-vibe (beta)
 
-[![npm version](https://img.shields.io/npm/v/turbo-vibe)](https://www.npmjs.com/package/turbo-vibe)
-[![build](https://github.com/dannycalleri/turbo-vibe/actions/workflows/ci.yml/badge.svg)](https://github.com/dannycalleri/turbo-vibe/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/notion-vibe)](https://www.npmjs.com/package/notion-vibe)
+[![build](https://github.com/dannycalleri/notion-vibe/actions/workflows/ci.yml/badge.svg)](https://github.com/dannycalleri/notion-vibe/actions/workflows/ci.yml)
 
 ## Overview
 
-`turbo-vibe` is a headless orchestrator for running parallel coding agents that attaches to your existing kanban.
+`notion-vibe` is a headless orchestrator for running parallel coding agents that attaches to your existing kanban.
 
 It currently supports:
 
@@ -26,7 +26,7 @@ The goal is to offer engineers a flexible, AI-powered tool for product managemen
 ## Installation
 
 ```bash
-npx turbo-vibe
+npx notion-vibe
 ```
 
 Minimum requirements:
@@ -49,7 +49,7 @@ NOTION_DATA_SOURCE_ID="..." # required when the database has multiple data sourc
 Helpful optional flags:
 
 ```bash
-npx turbo-vibe --project-dir /path/to/your/project --dry-run true
+npx notion-vibe --project-dir /path/to/your/project --dry-run true
 ```
 
 ## Support
@@ -75,7 +75,7 @@ Clone and install:
 
 ```bash
 git clone <repo-url>
-cd turbo-vibe
+cd notion-vibe
 npm install
 ```
 

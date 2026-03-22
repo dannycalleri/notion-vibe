@@ -83,7 +83,7 @@ export function loadConfig(argv: string[]): AppConfig {
     statusDone: args['status-done'] ?? process.env.NOTION_STATUS_DONE ?? 'Done',
     prProperty: args['pr-property'] ?? process.env.NOTION_PR_PROPERTY ?? 'PR',
     pollIntervalMs: toNumber(args['poll-interval-ms'] ?? process.env.POLL_INTERVAL_MS, 30000),
-    worktreeRoot: args['worktree-root'] ?? process.env.WORKTREE_ROOT ?? '.turbo-vibe/worktrees',
+    worktreeRoot: args['worktree-root'] ?? process.env.WORKTREE_ROOT ?? '.notion-vibe/worktrees',
     baseBranch: args['base-branch'] ?? process.env.BASE_BRANCH,
     agentCommand: args['agent-command'] ?? process.env.AGENT_COMMAND,
     agentArgs: args['agent-args'] ?? process.env.AGENT_ARGS,

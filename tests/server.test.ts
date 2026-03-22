@@ -70,7 +70,7 @@ const baseConfig = {
   statusDone: 'Done',
   prProperty: 'PR',
   pollIntervalMs: 1000,
-  worktreeRoot: '.turbo-vibe/worktrees',
+  worktreeRoot: '.notion-vibe/worktrees',
   baseBranch: undefined,
   agentCommand: 'codex',
   agentArgs: undefined,
@@ -177,13 +177,13 @@ describe('startServer', () => {
 
     await startServer(baseConfig);
 
-    expect(warnSpy).toHaveBeenCalledWith('[turbo-vibe] Notion database validation issues:');
-    expect(warnSpy).toHaveBeenCalledWith('[turbo-vibe] - Issue 1');
+    expect(warnSpy).toHaveBeenCalledWith('[notion-vibe] Notion database validation issues:');
+    expect(warnSpy).toHaveBeenCalledWith('[notion-vibe] - Issue 1');
   });
 
   it('retries PR creation without rerunning agent when content is unchanged and PR has no comments', async () => {
-    const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'turbo-vibe-retry-'));
-    const worktreeRoot = '.turbo-vibe/worktrees';
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'notion-vibe-retry-'));
+    const worktreeRoot = '.notion-vibe/worktrees';
     const worktreePath = path.join(repoRoot, worktreeRoot, 'notion/task-title-page1234');
     const statePath = path.join(repoRoot, worktreeRoot, '.task-state', 'page-1234.json');
 
@@ -224,8 +224,8 @@ describe('startServer', () => {
   });
 
   it('reruns agent with PR feedback when comments exist and keeps existing PR URL', async () => {
-    const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'turbo-vibe-feedback-'));
-    const worktreeRoot = '.turbo-vibe/worktrees';
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'notion-vibe-feedback-'));
+    const worktreeRoot = '.notion-vibe/worktrees';
     const worktreePath = path.join(repoRoot, worktreeRoot, 'notion/task-title-page1234');
 
     await mkdir(worktreePath, { recursive: true });
