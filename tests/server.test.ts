@@ -181,6 +181,67 @@ describe('startServer', () => {
     expect(warnSpy).toHaveBeenCalledWith('[notion-vibe] - Issue 1');
   });
 
+  it('normalizes origin-prefixed baseBranch before PR creation', async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'notion-vibe-base-branch-'));
+    const worktreeRoot = '.notion-vibe/worktrees';
+    const worktreePath = path.join(repoRoot, worktreeRoot, 'notion/task-title-page1234');
+
+    await mkdir(worktreePath, { recursive: true });
+
+    gitMock.getRepoRoot.mockResolvedValue(repoRoot);
+    gitMock.getWorktreeForBranch.mockResolvedValue({ path: worktreePath, branch: 'notion/task-title-page1234' });
+    gitMock.getStatusPorcelain.mockResolvedValue('M src/index.ts');
+    notionMock.queryDataSource.mockResolvedValueOnce({
+      results: [{ id: 'page-1234', properties: { PR: { type: 'url', url: null } } }],
+    });
+    githubMock.createPullRequest.mockResolvedValue({ html_url: 'https://github.com/octo-org/hello/pull/2' });
+
+    await startServer({
+      ...baseConfig,
+      dryRun: false,
+      baseBranch: 'origin/dev',
+      worktreeRoot,
+      projectDir: repoRoot,
+    });
+    await flushScheduledJobs();
+
+    expect(githubMock.createPullRequest).toHaveBeenCalledWith(expect.objectContaining({
+      base: 'dev',
+    }));
+  });
+
+  it('retries createWorktree with local ref when origin ref fails', async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'notion-vibe-ref-fallback-'));
+    const worktreeRoot = '.notion-vibe/worktrees';
+
+    gitMock.getRepoRoot.mockResolvedValue(repoRoot);
+    gitMock.getWorktreeForBranch.mockResolvedValue(null);
+    gitMock.getStatusPorcelain.mockResolvedValue('');
+    notionMock.queryDataSource.mockResolvedValueOnce({
+      results: [{ id: 'page-1234', properties: { PR: { type: 'url', url: null } } }],
+    });
+    gitMock.createWorktree
+      .mockImplementationOnce(async () => {
+        throw new Error('unknown revision');
+      })
+      .mockImplementationOnce(async ({ path: wtPath }: { path: string }) => {
+        await mkdir(wtPath, { recursive: true });
+      });
+
+    await startServer({
+      ...baseConfig,
+      dryRun: false,
+      worktreeRoot,
+      projectDir: repoRoot,
+    });
+    await flushScheduledJobs();
+
+    expect(gitMock.createWorktree).toHaveBeenCalledTimes(2);
+    expect(gitMock.createWorktree).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      baseRef: 'main',
+    }));
+  });
+
   it('dry run does not trigger git, PR, or Notion write side effects', async () => {
     const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'notion-vibe-dry-run-'));
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});

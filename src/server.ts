@@ -208,7 +208,7 @@ async function ensureWorktree({ repoRoot, worktreeRoot, branchName, baseRef }: E
       await createWorktree({ cwd: repoRoot, branch: branchName, path: worktreePath, baseRef });
     } catch (err) {
       if (baseRef.startsWith('origin/')) {
-        const fallbackRef = baseRef.replace(/^origin\\/, '');
+        const fallbackRef = baseRef.replace(/^origin\//, '');
         await createWorktree({ cwd: repoRoot, branch: branchName, path: worktreePath, baseRef: fallbackRef });
       } else {
         throw err;
@@ -456,7 +456,7 @@ export async function startServer(config: AppConfig) {
 
   const repoRoot = await getRepoRoot(config.projectDir);
   const rawBaseBranch = config.baseBranch || await getDefaultBaseBranch(repoRoot) || await getCurrentBranch(repoRoot);
-  const baseBranch = rawBaseBranch.replace(/^origin\\/, '');
+  const baseBranch = rawBaseBranch.replace(/^origin\//, '');
 
   const agentCommand = await ensureAgentCommand(config, config.projectDir);
   if (!agentCommand) {
