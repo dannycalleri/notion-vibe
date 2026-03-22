@@ -181,6 +181,35 @@ describe('startServer', () => {
     expect(warnSpy).toHaveBeenCalledWith('[notion-vibe] - Issue 1');
   });
 
+  it('dry run does not trigger git, PR, or Notion write side effects', async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'notion-vibe-dry-run-'));
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    gitMock.getRepoRoot.mockResolvedValue(repoRoot);
+    notionMock.queryDataSource.mockResolvedValueOnce({
+      results: [{ id: 'page-1234', properties: { PR: { type: 'url', url: null } } }],
+    });
+
+    await startServer({
+      ...baseConfig,
+      dryRun: true,
+      projectDir: repoRoot,
+    });
+    await flushScheduledJobs();
+
+    expect(gitMock.getWorktreeForBranch).not.toHaveBeenCalled();
+    expect(gitMock.createWorktree).not.toHaveBeenCalled();
+    expect(gitMock.getStatusPorcelain).not.toHaveBeenCalled();
+    expect(gitMock.addAllAndCommit).not.toHaveBeenCalled();
+    expect(gitMock.pushBranch).not.toHaveBeenCalled();
+    expect(agentMock.runAgent).not.toHaveBeenCalled();
+    expect(githubMock.createPullRequest).not.toHaveBeenCalled();
+    expect(notionMock.updatePage).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(
+      '[notion-vibe] [dry-run] No side effects: skipping worktree creation, agent execution, git commit/push, PR creation, and Notion updates.'
+    );
+  });
+
   it('retries PR creation without rerunning agent when content is unchanged and PR has no comments', async () => {
     const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'notion-vibe-retry-'));
     const worktreeRoot = '.notion-vibe/worktrees';

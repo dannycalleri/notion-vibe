@@ -21,7 +21,7 @@ The goal is to offer engineers a flexible, AI-powered tool for product managemen
 - Agent execution happens in isolated git worktrees per task.
 - Automatic branch, commit, push, and GitHub PR creation.
 - Automatic Notion card update.
-- Dry-run mode for validating control flow without side effects.
+- Dry-run mode for validating polling/planning flow without write side effects.
 
 ## Installation
 
@@ -90,7 +90,8 @@ npm run typecheck
 npm run lint
 ```
 
-Use dry run to validate orchestration flow without agent execution or git/PR side effects:
+Use dry run to validate orchestration flow without write side effects.
+Dry run still reads Notion task content, but it does not create worktrees, run agents, commit/push branches, create PRs, or update Notion pages:
 
 ```bash
 npm start -- --dry-run true

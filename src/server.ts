@@ -301,6 +301,18 @@ async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }: 
   const branchName = buildBranchName(title, page.id);
   const baseRef = baseBranch.startsWith('origin/') ? baseBranch : `origin/${baseBranch}`;
 
+  if (config.dryRun) {
+    log(`[dry-run] Task "${title}" would run on ${branchName} from ${baseRef}.`);
+    log('[dry-run] No side effects: skipping worktree creation, agent execution, git commit/push, PR creation, and Notion updates.');
+    if (shouldSkipAgent) {
+      log('[dry-run] Agent would be skipped: card content unchanged and no PR feedback comments.');
+    }
+    if (existingPrUrl) {
+      log(`[dry-run] Existing PR on card: ${existingPrUrl}`);
+    }
+    return;
+  }
+
   log(`Starting task "${title}" on ${branchName}`);
   const worktreePath = await ensureWorktree({
     repoRoot,
@@ -316,7 +328,7 @@ async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }: 
 
   if (shouldSkipAgent) {
     log('Skipping agent run: card content unchanged and no PR feedback comments.');
-  } else if (!config.dryRun) {
+  } else {
     const args = buildAgentArgs({
       command: agentCommand,
       approvalPolicy: config.agentApprovalPolicy,
@@ -337,14 +349,12 @@ async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }: 
       },
     });
     await saveTaskState(repoRoot, config.worktreeRoot, page.id, { contentHash });
-  } else {
-    log('Dry run enabled; skipping agent execution.');
   }
 
   const status = await getStatusPorcelain(worktreePath);
   if (!status && !shouldSkipAgent) {
     warn('No git changes detected after agent run.');
-  } else if (!config.dryRun) {
+  } else {
     if (status) {
       await addAllAndCommit(worktreePath, `notion: ${title} (${page.id})`);
     }
@@ -354,7 +364,7 @@ async function handlePage({ page, config, repoRoot, baseBranch, agentCommand }: 
   }
 
   let prUrl = existingPrUrl;
-  const shouldCreatePr = !config.dryRun && !prUrl && (Boolean(status) || shouldSkipAgent);
+  const shouldCreatePr = !prUrl && (Boolean(status) || shouldSkipAgent);
   if (shouldCreatePr) {
     try {
       prUrl = await createPrIfPossible({
@@ -495,6 +505,9 @@ export async function startServer(config: AppConfig) {
   }
 
   log('Server started. Watching for "In progress" tasks...');
+  if (config.dryRun) {
+    log('Dry run enabled: validating polling and planning only; no git, PR, or Notion write operations will run.');
+  }
   log(`Repo: ${repoRoot}`);
   log(`Base branch: ${baseBranch}`);
   log(`Poll interval: ${config.pollIntervalMs}ms`);
